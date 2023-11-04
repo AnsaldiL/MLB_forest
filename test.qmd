@@ -1,0 +1,147 @@
+---
+title: "Machine Learning et prediction d'un couvert forestier"
+author: Lucile ANSALDI, Youna DOUCHET, Lucia OLIVEIRA-CRUZ
+format: revealjs
+theme: beige
+editor: visual
+---
+
+## Objectif de l'étude
+
+------------------------------------------------------------------------
+
+Prédiction des couverts forestiers à partir de variables cartographiques.
+
+Pourquoi utiliser le machine learning ?
+
+-   Pour répertorier le couvert
+
+-   Eviter le déplacement de technicien.ne.s sur place
+
+-   Avoir des informations sur des terres qui ne sont pas sous contrôle direct
+
+------------------------------------------------------------------------
+
+## Présentation des données
+
+::: columns
+::: {.column width="40%"}
+Données issues utilisées dans une étude de Blackard et Dean, publiée en 1999, provenant du parc National Roosevelt, dans le Colorado. Le jeu de donné regroupe des données pédologiques et cartographique ainsi que la catégorie de couvert forestier.
+:::
+
+::: {.column width="60%"}
+```{r}
+forest= read.table(file = "covtype.data", sep=",", header=TRUE) 
+head(forest)
+```
+:::
+:::
+
+```{r echo = FALSE, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(FactoMineR)
+library(ggplot2)
+library(class)
+a <- rep("Soil_Type_",40)
+for (i in 1:40) {
+  a[i]<-paste0(a[i],as.character(i))
+} 
+
+name <- c("Elevation",
+          "Aspect",
+          "Slope",
+          "Horizontal_Distance_To_Hydrology",
+          "Vertical_Distance_To_Hydrology",
+          "Horizontal_Distance_To_Roadways",
+          "Hillshade_9am",
+          "Hillshade_Noon",
+          "Hillshade_3pm",
+          "Horizontal_Distance_To_Fire_Points",
+          "Wilderness_Area_1",
+          "Wilderness_Area_2",
+          "Wilderness_Area_3",
+          "Wilderness_Area_4",
+          a,
+          "Cover_Type")
+colnames(forest)<- name
+Cov_type = forest$Cover_Type
+Xforest <- subset(forest, select = -Cover_Type)
+pcaXforest <- PCA(Xforest, ncp = 2) 
+```
+
+## Implémentation des algorithmes
+
+## Méthodes testées
+
+Insérer le schéma de Lucia !
+
+## Data driven algorithms
+
+-   K-means
+
+-   K-nearest neighbourg
+
+-   autre méthodes...
+
+## Algorithme des K-means
+
+```{r}
+n_clusters = length(unique(Cov_type)) # Nombre de cluster attendu : autant que de couverts forestiers possibles
+set.seed(1)
+i.centers = sample(1:dim(pcaXforest$ind$coord)[1],n_clusters) # initialisation aléatoire des clusters. 
+centers = pcaXforest$ind$coord[i.centers,]
+km = kmeans(pcaXforest$ind$coord,centers,nstart=10,iter.max=50) # avec 10 sets aléatoires et 50 itérations au maximum
+cl = km$cluster # tous les individus sont associés à une classe
+
+cl_lab = cl
+for (k in 1:n_clusters){
+  ii = which(cl==k) 
+  counts=table(Cov_type[ii]) # Nb d'occurences de chaque classe
+  imax=which.max(counts) # Calcul de la classe majoritaire
+  maj_lab=attributes(counts)$dimnames[[1]][imax] # attribution de l'étiquette de la classe
+  print(paste("Classe ",k,", label majoritaire = ",maj_lab))
+  cl_lab[ii] = maj_lab
+}
+```
+
+## Résultats K-means
+
+::: columns
+::: {.column width="30%"}
+```{r echo=FALSE}
+accuracy <- sum(cl_lab == Cov_type)/(length(Cov_type))
+print(paste("l'accuracy de la classification avec l'algorithme des k-means est de",accuracy)) 
+```
+:::
+
+::: {.column width="70%"}
+```{r}
+#matrice de confusion et accuracy
+confusion = (conf_mat = table(Cov_type,cl_lab, dnn=list("Observed","Predicted")))
+print(confusion)
+
+# représentation de la matrice de confusion
+df = as.data.frame(confusion)
+df %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14)) 
+```
+:::
+:::
+
+## Des fréquences déséquilibrées
+
+```{r}
+hist(Cov_type, col="yellow3", main="Fréquence des types de couverts", xlab="Type de couvert", ylab="Nombre")
+```
+
+## Modèle driven algorithms
+
+-   autre méthodes...
