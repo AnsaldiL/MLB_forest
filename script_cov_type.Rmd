@@ -1,0 +1,216 @@
+---
+title: "Cover_Type"
+author: "Lucia, Lucile et Youna"
+date: "2023-11-03"
+output: html_document
+---
+
+# Introduction et présentation des données
+## Problématisation
+
+## Importation et formatage des données
+
+Importation des library nécessaires
+```{r, echo=false}
+library(tidyverse)
+library(dplyr)
+library(FactoMineR)
+library(ggplot2)
+library(class)
+```
+Importation des données et modification des noms de colonnes.
+
+```{r}
+forest= read.table(file = "covtype.data", sep=",", header=TRUE) 
+
+name <- c("Elevation",
+          "Aspect",
+          "Slope",
+          "Horizontal_Distance_To_Hydrology",
+          "Vertical_Distance_To_Hydrology",
+          "Horizontal_Distance_To_Roadways",
+          "Hillshade_9am",
+          "Hillshade_Noon",
+          "Hillshade_3pm",
+          "Horizontal_Distance_To_Fire_Points",
+          "Wilderness_Area_1",
+          "Wilderness_Area_2",
+          "Wilderness_Area_3",
+          "Wilderness_Area_4",
+          a,
+          "Cover_Type")
+colnames(forest)<- name
+```
+Extraction des labels à prédire pour les apprentissages supervisés. Les labels sont stocké dans Cov_type et Xforest est le jeu de donné initial auquel est enlevé la colonne des labels.
+```{r}
+Cov_type = forest$Cover_Type
+Xforest <- subset(forest, select = -Cover_Type)
+```
+
+
+# Implémentation des algorithmes de machine learning
+## Data driven algorithms
+
+### Unsupervised
+#### Algorithme des k-means
+
+```{r}
+pcaXforest <- PCA(Xforest, ncp = 2) #réduction de dimension pour les k-means
+
+
+n_clusters = length(unique(Cov_type)) # Number of clusters
+set.seed(1)
+i.centers = sample(1:dim(pcaXforest$ind$coord)[1],n_clusters) # random initialisation of clusters
+centers = pcaXforest$ind$coord[i.centers,]
+km = kmeans(pcaXforest$ind$coord,centers,nstart=10,iter.max=50)
+cl = km$cluster
+
+cl_lab = cl
+for (k in 1:n_clusters){
+  ii = which(cl==k) # Individus de la classe k
+  counts=table(Cov_type[ii]) # Nb d'occurences de chaque label
+  imax=which.max(counts) # Calcul du majoritaire
+  maj_lab=attributes(counts)$dimnames[[1]][imax] # Son étiquette
+  print(paste("Classe ",k,", label majoritaire = ",maj_lab))
+  cl_lab[ii] = maj_lab
+}
+
+conf_mat_k_mean_dtset = (conf_mat = table(Cov_type,cl_lab))
+print(conf_mat_k_mean_dtset)
+accuracy <- sum(cl_lab == Cov_type)/(length(Cov_type))
+print(accuracy) 
+#0.5507693
+
+#commenter
+#faire une belle matrice de confusion
+```
+
+### Supervised
+
+#### k-NN : pour comparer avec Youna
+
+Recherche du meilleur nombre de voisins
+```{r}
+#on travaille sur la dimention réduite avec l'objet pcaXforest
+Cov_type
+C = factor(Cov_type,levels=c(1,2,3,4,5,6,7)) 
+nb_Cov_type <- length(unique(Cov_type))
+
+# on va trouver le meilleur nombre de voisin possible pour minimiser l'erreur
+nb_neighbors = c(1,5,10,20,25,30,35,40,45,50)
+
+n = dim(pcaXforest$ind$coord)[1]
+B = 10
+err_knn = matrix(0,B,length(nb_neighbors))
+
+for (b in 1:B) { #10 répétitions du modèle 
+  set.seed(b)
+  
+  itrain <- c()
+  for (i in 1:nb_Cov_type) {
+    itrain <- c(itrain,sample(x = which(forest$Cover_Type == i),size = 1000)) #1000 de chaque cov type ! On stock les numéro des lignes qui vont être mises dans train
+  }
+  for (i in unique(forest$Soil_type)) { #forcer pour avoir un soil type de chaque
+    itrain <- c(itrain,sample(x = which(forest$Soil_type == i ),size = 3)) #forcer pour avoir au moins 3 données de chaque soiltype
+    #au total on a 7120 données d'entrainement
+  }
+    
+  itest <- setdiff(1:581012,itrain)
+  itest <- sample(itest,2380) #on prend 2380 données de test (on a donc environ 9500 données pour chaque experience avec 2/3 de données d'entrainement et 1/3 de données test)
+  
+  Xs_train = scale(pcaXforest$ind$coord[itrain,])
+  Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
+  for (i in 1:length(nb_neighbors)) {
+    knn_res = knn(Xs_train,Xs_test,Cov_type[itrain],k=nb_neighbors[i],prob=TRUE)
+    err_knn[b,i] = sum(Cov_type[itest]!=knn_res)/length(itest)
+  }
+  
+}
+
+apply(err_knn,2,mean) #on fait la moyenne des col de err_knn 
+colnames(err_knn)=nb_neighbors
+boxplot(err_knn) ## on va prendre 10 voisins
+w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
+print(w)
+```
+
+Application de l'algorithme aux données avec le nombre de voisins optimal
+```{r}
+
+library(pROC)
+w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
+
+n = dim(pcaXforest$ind$coord)[1]
+B = 10 # number of samples for the cross validation
+y_test = y_prob = NULL
+for (b in 1:B){
+  set.seed(b)
+  
+  itrain <- c()
+  for (i in 1:7) {
+    itrain <- c(itrain,sample(x = which(forest$Cover_Type == i),size = 1000)) #1000 de chaque cov type ! On stock les numéro des lignes qui vont être mises dans train
+  }
+  for (i in unique(forest$Soil_type)) { #forcer pour avoir un soil type de chaque
+    itrain <- c(itrain,sample(x = which(forest$Soil_type == i ),size = 3)) #forcer pour avoir au moins 3 données de chaque soiltype
+    #au total on a 7120 données d'entrainement
+    
+    itest <- setdiff(1:581012,itrain)
+    itest <- sample(itest,2380) #on prend 2380 données de test (on a donc environ 9500 données pour chaque experience avec 2/3 de données d'entrainement et 1/3 de données test)
+  }
+  
+  Xs_train = scale(pcaXforest$ind$coord[itrain,])
+  Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
+  knn_res = knn(Xs_train,Xs_test,C[itrain],k=nb_neighbors[w],prob=TRUE)
+  y_prob = c(y_prob,attributes(knn_res)$prob)
+  y_test = c(y_test,C[itest])
+}
+
+multiclass.roc(y_test, y_prob, level = 7, plot=TRUE) #interet de la courbe ROC..?
+
+Cres <- C[itest]
+
+conf_mat_knn = (conf_mat = table(Cres, knn_res))
+print(conf_mat_knn)
+
+accuracy <- sum(knn_res == Cres)/(length(Cres))
+print(accuracy)
+#0.3579832
+```
+
+#### k-NN : pour comparer avec Lucia
+
+Application de l'algorithme aux données avec le nombre de voisins optimal
+```{r}
+w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
+
+n = dim(pcaXforest$ind$coord)[1]
+B = 10 # number of samples for the cross validation
+y_test = y_prob = NULL
+for (b in 1:B){
+  set.seed(b)
+  
+  itrain <- sample(c(1:nrow(forest)), round((2/3)*n))
+  itest <- setdiff(c(1:nrow(forest)), itrain)
+  
+  Xs_train = scale(pcaXforest$ind$coord[itrain,])
+  Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
+  knn_res = knn(Xs_train,Xs_test,C[itrain],k=25, prob=TRUE)#nb_neighbors[w],prob=TRUE)
+  y_prob = c(y_prob,attributes(knn_res)$prob)
+  y_test = c(y_test,C[itest])
+}
+
+#multiclass.roc(y_test, y_prob, level = 7, plot=TRUE)
+
+Cres <- C[itest]
+
+conf_mat_knn = (conf_mat = table(Cres, knn_res))
+print(conf_mat_knn)
+
+accuracy <- sum(knn_res == Cres)/(length(Cres))
+print(accuracy)
+#0.5693757 with B= 1
+
+```
+
+
+## Model driven algorithm
