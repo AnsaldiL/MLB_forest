@@ -1,18 +1,18 @@
 ---
 title: "Machine Learning et prediction d'un couvert forestier"
 author: Lucile ANSALDI, Youna DOUCHET, Lucia OLIVEIRA-CRUZ
-format: revealjs
-theme: beige
+date: 10/11/2023
 editor: visual
+format: 
+  revealjs :
+     slide-number: true
 ---
 
 ## Objectif de l'étude
 
-------------------------------------------------------------------------
-
 Prédiction des couverts forestiers à partir de variables cartographiques.
 
-Pourquoi utiliser le machine learning ?
+Pourquoi utiliser le **machine learning** ?
 
 -   Pour répertorier le couvert
 
@@ -20,22 +20,16 @@ Pourquoi utiliser le machine learning ?
 
 -   Avoir des informations sur des terres qui ne sont pas sous contrôle direct
 
-------------------------------------------------------------------------
-
 ## Présentation des données
 
-::: columns
-::: {.column width="40%"}
-Données issues utilisées dans une étude de Blackard et Dean, publiée en 1999, provenant du parc National Roosevelt, dans le Colorado. Le jeu de donné regroupe des données pédologiques et cartographique ainsi que la catégorie de couvert forestier.
-:::
+Données issues utilisées dans une étude de Blackard et Dean, publiée en 1999, provenant du parc National Roosevelt, dans le Colorado.
 
-::: {.column width="60%"}
+Le jeu de donné regroupe des données pédologiques et cartographique ainsi que la catégorie de couvert forestier.
+
 ```{r}
 forest= read.table(file = "covtype.data", sep=",", header=TRUE) 
-head(forest)
+str(forest)
 ```
-:::
-:::
 
 ```{r echo = FALSE, include=FALSE}
 library(tidyverse)
@@ -70,8 +64,6 @@ Xforest <- subset(forest, select = -Cover_Type)
 pcaXforest <- PCA(Xforest, ncp = 2) 
 ```
 
-## Implémentation des algorithmes
-
 ## Méthodes testées
 
 Insérer le schéma de Lucia !
@@ -84,9 +76,11 @@ Insérer le schéma de Lucia !
 
 -   autre méthodes...
 
-## Algorithme des K-means
+# Algorithme des K-means
 
-```{r}
+## Code K-means
+
+```{r, echo = TRUE}
 n_clusters = length(unique(Cov_type)) # Nombre de cluster attendu : autant que de couverts forestiers possibles
 set.seed(1)
 i.centers = sample(1:dim(pcaXforest$ind$coord)[1],n_clusters) # initialisation aléatoire des clusters. 
@@ -105,22 +99,23 @@ for (k in 1:n_clusters){
 }
 ```
 
-## Résultats K-means
+### 
 
-::: columns
-::: {.column width="30%"}
-```{r echo=FALSE}
+## Résultat K-means
+
+<div>
+
+```{r accuracy kmeans, echo=FALSE}
 accuracy <- sum(cl_lab == Cov_type)/(length(Cov_type))
 print(paste("l'accuracy de la classification avec l'algorithme des k-means est de",accuracy)) 
 ```
-:::
 
-::: {.column width="70%"}
-```{r}
+```{r, echo=FALSE}
 #matrice de confusion et accuracy
 confusion = (conf_mat = table(Cov_type,cl_lab, dnn=list("Observed","Predicted")))
-print(confusion)
+```
 
+```{r mat conf kmean}
 # représentation de la matrice de confusion
 df = as.data.frame(confusion)
 df %>% 
@@ -130,16 +125,137 @@ df %>%
   scale_fill_gradient(low="#FFFF88",high="#FF0000")+
   coord_fixed()+
   theme_minimal()+
+  ggtitle("Matrice de confusion K-means")+
   theme(axis.text = element_text(size = 12))+
-  theme(axis.title = element_text(size = 14)) 
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
 ```
-:::
-:::
 
-## Des fréquences déséquilibrées
+</div>
 
-```{r}
-hist(Cov_type, col="yellow3", main="Fréquence des types de couverts", xlab="Type de couvert", ylab="Nombre")
+## Des fréquences déséquilibrées...
+
+```{r freq}
+hist(Cov_type, col="orange2", main="Fréquence des types de couverts", xlab="Type de couvert", ylab="Nombre")
+```
+
+## Apprentissage supervisé et partitionnement du jeu de données
+
+Séparation du jeu de données de deux manières différentes : - 2/3 train 1/3 test - partitionnement plus fin pour correspondre aux particularité du jeu de données et réduire le temps de calcul
+
+### Fonction de partitionnement :
+
+```{r part_data, echo=TRUE}
+part_data <- function(data){
+  # prend en entree le je de donnee à echantillonner
+  # renvoie les indices des individus de l'echantillon d'entrainement et de l'echantillon de validation
+  nb_indiv <- length(data[,1])
+  itrain <- c()
+  itest <- c(1:nb_indiv)
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 15:54) { #les colonnes 14 à 53 sont les colonnes "soil type"
+    itrain <- c(itrain,sample(x = which(data[,i] == 1 ),size = 3)) 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 11:14) { #les colonnes" 14 à 53 sont les colonnes "soil type""Wilderness_area"
+    itrain <- c(itrain,sample(x = setdiff(which(data[,i] == 1 ),itrain),size = 3)) #dans les données pas deja echantilonnee 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 1000 observations par type de recouvrement végétal
+  for (i in 1:7) {
+    itrain <- c(itrain,sample(x = setdiff(which(data$Cover_Type == i),itrain),size = 1000))
+  }
+  
+  itest <- setdiff(itest,itrain)
+  itest <- sample(itest,3560) 
+  
+  return(list(itrain,itest))
+}
+```
+
+# Méthode K-NN {style=".smaller"}
+
+```{r knn nb n}
+C = factor(Cov_type,levels=c(1,2,3,4,5,6,7)) 
+nb_Cov_type <- length(unique(Cov_type))
+
+# on va trouver le meilleur nombre de voisin possible pour minimiser l'erreur
+nb_neighbors = c(1,5,10,20,25,30,35,40)
+
+n = dim(pcaXforest$ind$coord)[1]
+B = 10
+err_knn = matrix(0,B,length(nb_neighbors))
+
+
+for (b in 1:B) { #10 répétitions du modèle 
+  set.seed(b)
+  
+  itrain <- unlist(part_data(forest)[1])
+  itest <- unlist(part_data(forest)[2])
+  
+  
+  Xs_train = scale(pcaXforest$ind$coord[itrain,])
+  Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
+  for (i in 1:length(nb_neighbors)) {
+    knn_res = knn(Xs_train,Xs_test,Cov_type[itrain],k=nb_neighbors[i],prob=TRUE)
+    err_knn[b,i] = sum(Cov_type[itest]!=knn_res)/length(itest)
+  }
+  
+}
+
+apply(err_knn,2,mean) #on fait la moyenne des col de err_knn 
+colnames(err_knn)=nb_neighbors
+boxplot(err_knn, main = "Erreur et nombre de voisins", col='orange2') 
+w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
+```
+
+## Résultats de la méthode K-NN {style=".smaller"}
+
+Avec le partitionnement des données adapté
+
+```{r include = TRUE}
+w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
+
+n = dim(pcaXforest$ind$coord)[1]
+B = 10 # number of samples for the cross validation
+y_test = y_prob = NULL
+for (b in 1:B){
+  set.seed(b)
+  
+  itrain <- unlist(part_data(forest)[1])
+  itest <- unlist(part_data(forest)[2])
+  
+  Xs_train = scale(pcaXforest$ind$coord[itrain,])
+  Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
+  knn_res = knn(Xs_train,Xs_test,C[itrain],k=nb_neighbors[w],prob=TRUE)
+  y_prob = c(y_prob,attributes(knn_res)$prob)
+  y_test = c(y_test,C[itest])
+}
+
+#multiclass.roc(y_test, y_prob, level = 7, plot=TRUE) #interet de la courbe ROC..?
+
+Cres <- C[itest]
+
+conf_mat_knn = (conf_mat = table(Cres, knn_res, dnn=list("Predicted", "Observed")))
+
+accuracy <- sum(knn_res == Cres)/(length(Cres))
+print(paste("l'accuracy est de :", accuracy))
+#0.3579832
+
+# représentation de la matrice de confusion
+df = as.data.frame(conf_mat_knn)
+df %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion K-means")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 ## Modèle driven algorithms
