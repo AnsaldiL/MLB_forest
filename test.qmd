@@ -1,9 +1,10 @@
 ---
 title: "Machine Learning et prediction d'un couvert forestier"
 author: Lucile ANSALDI, Youna DOUCHET, Lucia OLIVEIRA-CRUZ
-format: revealjs
-theme: beige
-editor: visual
+date: 10/11/2023
+format: 
+  revealjs :
+     slide-number: true
 ---
 
 ## Objectif de l'étude
