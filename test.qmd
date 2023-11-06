@@ -537,7 +537,7 @@ for (b in 1:N) {
 
 ```{r}
 confusion3 = table(Y2,y_pred,dnn=list("Observed","Predicted"))
-df3 = as.data.frame(confusion4)
+df3 = as.data.frame(confusion3)
 df3 %>% 
   ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
   geom_tile()+
