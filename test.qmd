@@ -74,6 +74,7 @@ pcaXforest <- PCA(Xforest, ncp = 2)
 
 ![](Demarche.jpg)
 
+
 ## Data driven algorithms
 
 -   K-means
@@ -269,6 +270,8 @@ df %>%
   theme(axis.title = element_text(size = 14))+
   theme(plot.title = element_text(hjust = 0.5))
 ```
+
+Avec le partitionnement 2/3 et 1/3, l'accurracy monte à 0.5693757
 
 ## Algorithme decision tree
 
