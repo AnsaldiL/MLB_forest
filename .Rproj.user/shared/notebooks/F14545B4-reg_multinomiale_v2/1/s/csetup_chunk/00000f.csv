@@ -1,0 +1,14 @@
+"0","knitr::opts_chunk$set(echo = TRUE)"
+"0","library(ggplot2) # graph package"
+"0","library(tinytex) # Pour la sortie pdf"
+"2","Avis : le package ‘tinytex’ a été compilé avec la version R 4.2.3"
+"0","library(corrplot)# Correlation matrix calculus"
+"2","Avis : le package ‘corrplot’ a été compilé avec la version R 4.2.3"
+"2","corrplot 0.92 loaded
+"
+"0","library(glmnet) # multinomiale avec pénalité lasso"
+"2","Avis : le package ‘glmnet’ a été compilé avec la version R 4.2.3"
+"2","Le chargement a nécessité le package : Matrix
+"
+"2","Loaded glmnet 4.1-8
+"
