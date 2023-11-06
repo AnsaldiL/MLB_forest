@@ -2,7 +2,10 @@
 title: "Machine Learning et prediction d'un couvert forestier"
 author: Lucile ANSALDI, Youna DOUCHET, Lucia OLIVEIRA-CRUZ
 date: 10/11/2023
+<<<<<<< HEAD
 editor: visual
+=======
+>>>>>>> b254ed273ed03acf8d808a32eb84d4d73c949708
 format: 
   revealjs :
      slide-number: true
@@ -66,7 +69,8 @@ pcaXforest <- PCA(Xforest, ncp = 2)
 
 ## Méthodes testées
 
-Insérer le schéma de Lucia !
+
+![](C:/Users/lucia/OneDrive/Documents/M2/Cours/MLB/GITHUB_MLB/MLB_forest/Demarche.jpg)
 
 ## Data driven algorithms
 
@@ -74,7 +78,9 @@ Insérer le schéma de Lucia !
 
 -   K-nearest neighbourg
 
--   autre méthodes...
+-   Decision tree
+
+-   Random forest
 
 # Algorithme des K-means
 
@@ -258,6 +264,13 @@ df %>%
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
+## Algorithme decision tree
+
+## Algorithme random forest
+
+
 ## Modèle driven algorithms
 
--   autre méthodes...
+-   Multinomial model
+
+-   Neural model
