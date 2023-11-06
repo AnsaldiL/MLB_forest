@@ -84,7 +84,9 @@ pcaXforest <- PCA(Xforest, ncp = 2)
 
 -   K-nearest neighbourg
 
--   autre méthodes...
+-   Decision tree
+
+-   Random forest
 
 ## Algorithme des K-means
 
@@ -144,6 +146,13 @@ df %>%
 hist(Cov_type, col="yellow3", main="Fréquence des types de couverts", xlab="Type de couvert", ylab="Nombre")
 ```
 
+## Algorithme decision tree
+
+## Algorithme random forest
+
+
 ## Modèle driven algorithms
 
--   autre méthodes...
+-   Multinomial model
+
+-   Neural model
