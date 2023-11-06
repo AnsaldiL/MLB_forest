@@ -1,0 +1,5 @@
+"0","  Xtest_inter <- model.matrix(f2, cbind(Xtest,Ytest))[, -1]
+"
+"2","Erreur dans model.frame.default(object, data, xlev = xlev) : 
+  les longueurs des variables diffèrent (trouvé pour 'Elevation')
+"

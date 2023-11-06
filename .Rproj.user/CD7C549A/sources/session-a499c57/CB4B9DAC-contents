@@ -1,0 +1,468 @@
+---
+title: "GENERALIZED LINEAR MODEL - BINARY DATA"
+author: "Yannick Outreman"
+date: "`r Sys.Date()`"
+output:
+  #pdf_document: default
+  #word_document: default
+  html_document:
+  #df_print: paged
+---
+
+```{rWD, include=FALSE}
+#First set the working directory
+setwd("C:/Users/youy0/Desktop/master/S9/ASA/TD2")
+#OR use the session menu : Session/Set Working Directory/Choose directory
+```
+
+```{=html}
+<style>
+body {
+text-align: justify}
+</style>
+```
+
+```{r init, include=FALSE}
+#Second configure your session and load R packages
+rm(list=ls()) # Properly clear workspace
+library(knitr)
+opts_chunk$set(echo = FALSE, comment = "", cache = TRUE, fig.align = "center")
+library(ggplot2) # graph package
+library(tinytex) # Pour la sortie pdf
+library(corrplot)# Correlation matrix calculus
+library(plot3D)# For 3D plot
+library(DHARMa)# Model diagnosis
+library(rcompanion)# Model pseudo R²
+library(lattice)# multipanel graphics
+```
+
+# GENERAL INTRODUCTION
+
+General Linear Models (e.g., linear regression, ANOVA, ANCOVA) are used to model the relationship between a continuous response variable $Y$ and one or more explanatory variables $X_{1}$,$X_{2}$...$X_{p}$. Three assumptions are associated with the use of General linear models, being *independence of residuals*, *normality of residuals* and *homogeneity of variances*. However, in our disciplines, we often analyse $Y$ response that could be discrete and then, may depart from the Gaussian assumption. 
+
+**Example 1** : if we had surveyed a forest and wanted to analyse how the presence of a squirrel varied with time, distance from the forest edge, tree species and local temperature, the response variable is discrete: the presence or absence of a squirrel in a tree. This response is a binary data and follows a Binomial distribution.
+
+**Example 2** : if we had surveyed an orchard and wanted to analyse how the number of pest insects on a leaf varied with time, distance from the edge, the tree age and the local temperature, the response variable is discrete: the number of insects on a leaf. This response is a count data and can follow a Poisson or Negative Binomial distribution.
+
+Discrete response data, like counts and binary data, generally exhibits a mean-variance relationship such that the variance of $Y$ varies with mean of $Y$. This mean-variance relationship suggests that variance can not be homogeneous in a data as depending on mean (e.g. for counts that are on average 25, we would expect a much larger variance than when the counts are on average 10)while General Linear Models expect constant variance (homogeneity of variance). In addition, when performing a General Linear Model on a count data, predicted values can be negative and residuals non normally distributed. In conclusion, using General Linear Model on discrete response often generate departures from its expectancies. Hence, we need specific tools to analyse discrete response data. These tools are **Generalized Linear Models**. 
+
+A Generalized Linear Model (GLM) consists of three steps:  
+1. Assumption of the distribution of the response variable $Y_{i}$  
+2. The specification of the systematic part; this is the linear function of the explanatory variables (the linear predictor called $\eta$)  
+3. The relationship between the mean value of $Y_{i}$ and the systematic part. This is also called the link between the mean and the systematic part: **the link function noted $g$ **. 
+
+As a consequence, a Generalized Linear Model (GLM) makes some important assumptions :  
+1. The observed $Y$ are independent, conditional on some predictors $X$  
+2. The response $Y$ come from a known distribution with a known mean-variance relationship  
+3. There is a straight line relationship between a known function $g$ of the mean of $Y$ and the predictors $X$
+
+So, a generalized linear model can be written as follow:
+$$g(\mu_{y})= \alpha+ \beta_{1}.X{i1}+ \beta_{2}.X{i2}+\beta_{3}.X{i3}+...\beta_{p}.X{ip} = \eta $$
+The linear predictor, $\eta$, emerges from the linear model as a sum of the terms for each of the $p$ parameters. This is not a value of $Y$. The value of $\eta$ is obtained by transforming the value of $Y$ by the link function, and the predicted value of $Y$ is obtained by applying the inverse link function to $\eta$.
+
+We will focus here on **binary data**. Binary data is data whose unit can take on only two possible states. These are often labelled as 0 and 1, and often referred to as "success" and "failure", where 1 and 0 thus correspond to counting the number of successes (in one trial). Often, binary data is used to represent one of two conceptually opposed values, e.g:  
+- the outcome of an experiment ("success" or "failure")  
+- the response to a yes-no question ("yes" or "no")  
+- presence or absence of some feature ("is present" or "is not present")  
+- the truth or falsehood of a proposition ("true" or "false", "correct" or "incorrect")  
+- the state of an object (e.g. "healthy" or "parasitized")  
+- ....
+
+Such a binary response follows a Binomial distribution that is defined as follows. We have $N$ independent and identicals trials, each with probability $P(Y_{i}=1)=\pi$ of success, and probability $P(Y_{i}=0)=(1-\pi)$ on failure. The term 'independent' means that all trials are unrelated and the term 'identical' means that each trial has the same probability of success. Under these assumptions, the density function is given by
+$$ f(y;\pi)=\binom{N}{y}.\pi^{y}.(1-\pi)^{(N-y)}$$
+
+The mean and variance of a Binomial distribution are given by
+$$E(Y)=N.\pi\:\:\:\:\:\:\:\:\:\:\:\:\:\:\:\:\:var(Y)=N.\pi.(1-\pi)$$
+
+In this worked exercise, Binomial distribution will be considered. In a Binomial Generalized Linear model, the link function is **logit** so that
+$$logit(\mu_{y})= \alpha+ \beta_{1}.X{i1}+ \beta_{2}.X{i2}+\beta_{3}.X{i3}+...\beta_{p}.X{ip} = \eta $$
+The predicted values of $Y$ is obtained by applying the inverse link function to $\eta$.
+$$\mu_{y}= \frac {e^{\eta}}{1+e^{\eta}} $$
+Binomial GLM models have a binomial error structure. This error structure allows, among other things, to correctly specify the relationship between the mean and the variance. This relationship is used by the maximum likelihood approach to estimate the coefficients and standard errors of the GLM model parameters.
+
+# GLM BINARY DATA - BINOMIAL EXAMPLE
+
+## DATA DESCRIPTION AND OBJECTIVES
+
+For this worked exercise, we will use data from a study performed by Maggi (unpublished until now). Bumble bees are known as pollen collector insects. Maggi studied the use (yes or no) of the acarinarium in two different bumble bees species ($Bombus\:atratus$ and $Bombus \:opifex$) in relation to castes and total abundance of mites found on the bumble bee’s body. The acarinarium is a specialized anatomical morphology that bumble bees have developed to help the retention of mites in their body. Carrying mites appears to be beneficial for some nest-making bumble bee species as mites are capable of feeding on fungi whose presence in the nest may affect the bumble bee’s offspring. 
+
+The data are in the file **Bumblebees.txt**.
+
+```{r global data, echo=TRUE,include=TRUE}
+# Dataset import
+dataBombus <- read.table("Bumblebees.txt", dec=".", header = TRUE)
+dataBombus$Castes<-as.factor(dataBombus$Castes)
+dataBombus$Species<-as.factor(dataBombus$Species)
+str(dataBombus)
+# Check for presence of missing values
+colSums(is.na(dataBombus))
+# There is no missing value.
+```
+
+Variables are:  
+- *Species* = the species of a given bumblebee, categorical variable  
+- *Castes* = the caste of a given bumblebee ('Worker', 'Queen' or 'Drone'), categorical variable  
+- *TotalMites* = Total number of mites counted on the bumblebee’s body, continuous variable  
+- *Acarinarium* = presence(coded 1)-absence(coded 0) of an acarinarium on the bumblebee, binary response  
+
+**Objective**: you will model the use of acarinarium (1 = yes, 0 = no) as a function of castes, total number of mites and bumble bee species. One of the underlying questions behind this research is whether the effect of the number of mites on the use of the acarinarium differs between the two species (interaction Species:TotalMites). 
+
+**Method**: In the present worked exercise, you will perform a Binomial GLM..  
+
+## DATA EXPLORATION
+
+Before any statistical analysis, you **MUST** explore the data in order to prevent any error. Here is the list of exploration to perform before modelling:
+
+1.  Check presence of outliers in $Y$ and distribution of $Y$ values
+2.  If $X$ is a quantitative independent variable, check presence of outliers in X and distribution of X values  
+2b. If $X$ is a qualitative independent variable, analyse the number of levels and the number of individuals per level
+3.  Analyse the potential relationships between $Y$ and the $X_{s}$
+4.  Check presence of interactions between $X_{s}$
+5.  Check presence of collinearity between $X_{s}$
+
+### Outliers in $Y$ and distribution of $Y$
+
+As $Y$ is a binary variable, there is no distribution. However, we could inspect how many 0 and 1 we have.
+```{r dataY, include=TRUE}
+# Number of 0 and 1 in Y
+table(dataBombus$Acarinarium)
+```
+On peut estimer la probabilité espérée de présence (autour de 0.6/7)
+
+### For the $X$ that is continuous : check outliers and distribution
+
+```{r dataCov, include=TRUE, fig.height=3, fig.width=8}
+par(mfrow=c(1,3))
+
+# Length
+# Cleveland plot
+dotchart(dataBombus$TotalMites,pch=16,col='blue',xlab='Total Number of Mites')
+# Histogram
+hist(dataBombus$TotalMites,col='blue',xlab="Total Number of Mites",main="")
+# Quantile-Quantile plot
+qqnorm(dataBombus$TotalMites,pch=16,col='blue',xlab='')
+qqline(dataBombus$TotalMites,col='red')
+```
+Given distribution of this covariate, **a sqrt transformation** is necessary for reducing the range of $X$ variation.  
+Nombres très variables de nombre de mites, pb pour la régression car bonne au début lais que quelques points dans le fortes valeurs, solution rendre homogène valeurs de x
+
+
+```{r dataCov2, include=TRUE, fig.height=3, fig.width=8}
+dataBombus$SQRTMites<-sqrt(dataBombus$TotalMites)
+par(mfrow=c(1,3))
+# Length
+# Cleveland plot
+dotchart(dataBombus$SQRTMites,pch=16,col='blue',xlab='SQRT Total Number of Mites')
+# Histogram
+hist(dataBombus$SQRTMites,col='blue',xlab="SQRT Total Number of Mites",main="")
+# Quantile-Quantile plot
+qqnorm(dataBombus$SQRTMites,pch=16,col='blue',xlab='')
+qqline(dataBombus$SQRTMites,col='red')
+```
+Make conclusion about this $X$ continuous independent variable  
+Il n'y a pas d'outliers et la distribution n'est pas normale 
+
+### For the two categorical $Xs$ : number of levels and number of individuals per level
+
+```{r datafact, include=TRUE}
+# Factor Species
+summary(dataBombus$Species)
+# Factor Castes
+summary(dataBombus$Castes)
+```
+Make conclusion about these $X$ categorical independent variables.  
+Plus d'ouvrières que de reines et nombre intermédiaire de mâles
+
+### Analysis of the potential relationships Y vs Xs
+
+We can graphically analyze the possible relationships between Y and Xs. Beware, this graphical analysis of the relationships between Y and X **does not in any way predict the significance of the relationship**. Statistical modeling remains the only way to identify whether the relationship exists or not.
+```{r datagraph, include=TRUE, fig.height=4, fig.width=10}
+par(mfrow=c(1,3))
+# Length
+plot(dataBombus$Acarinarium~dataBombus$SQRTMites,pch=16,col='blue',xlab='SQRT Number of mites',ylab='Presence of an acarinarium')
+# Sex
+mosaicplot(dataBombus$Acarinarium~dataBombus$Species
+           ,color=c('blue3','red2')
+           ,main="relationship Actinarium & Species")
+# Castes
+mosaicplot(dataBombus$Acarinarium~dataBombus$Castes
+           ,color=c('#339900','#3399CC','#993300')
+           ,main="relationship Actinarium & Castes")
+```
+Make conclusion about these graphics:
+
+1) dur de voir une tendance  
+2) sp bleue porterai plpus que la rouge 
+3)Idem pour les castes 
+
+### Analysis of possible interactions between all Xs independent variables
+
+Based on the underlying biological question, we will consider only the interaction between Species and Number of mites. To estimate presence of an interactive effect between both, we will develop a graphical approach.
+```{r dataInter, include=TRUE, fig.height=4, fig.width=4}
+par(mfrow=c(1,1))
+# Interactions between Length & Area
+
+# Using plot
+plot(dataBombus$Acarinarium~dataBombus$SQRTMites,type='n',ylab = "Presence of acarinarium",xlab="SQRTMites")
+points(dataBombus$Acarinarium[dataBombus$Species=="B_atratus"]~dataBombus$SQRTMites[dataBombus$Species=="B_atratus"],pch=16,cex=1,col='blue3')
+points(dataBombus$Acarinarium[dataBombus$Species=="B_opifex"]~dataBombus$SQRTMites[dataBombus$Species=="B_opifex"],pch=17,cex=1,col='red2')
+
+# Using curves (Zuur et al. code)
+par(mfrow=c(1,1))
+coplot(Acarinarium~SQRTMites|Species,
+       data = dataBombus ,
+        panel = function(x, y, ...) {
+         if(length(y[y>0])>5 & length(y[y==0])>5 ) {
+           tmp <- glm(y ~ x, family=binomial, na.action = na.omit)
+           MyDat<-data.frame(x=seq(from=min(x,na.rm=TRUE),
+                                 to=max(x,na.rm=TRUE),
+                                 length=25))
+           P1<-predict(tmp,newdata=MyDat, type="response")
+           lines(MyDat$x,P1,col='red2')
+         }
+         points(x, y,pch=16,col='blue3') })
+```
+Make conclusions about those graphics:  
+Chez atratus, le nombre d'acarien semble influencer la présence d'un actinarium mais pas / peu de tenadance chez opifex
+
+### Check for colinearity between Xs
+
+In order to prevent collinearity in the modelling, we will analyse how the predictor variables are related. First, we will check how the both factors are crossed and then, we estimate whether these two categorical predictors influence the continuous one by using boxplot graphics.
+```{r datacolin, include=TRUE, fig.height=4, fig.width=8}
+# Checking collinearity between both categorical independent variables
+table(dataBombus$Species,dataBombus$Castes)
+
+# Checking collinearity between categorical and continuous independent variables
+par(mfrow=c(1,2))
+#Number of Mites and Species
+boxplot(dataBombus$SQRTMites~dataBombus$Species, varwidth = TRUE, ylab = "Number of Mites", xlab = "Sex",col=c('blue3','red2'), main = "")
+#Number of Mites and Castes
+boxplot(dataBombus$SQRTMites~dataBombus$Castes, varwidth = TRUE, ylab = "Number of Mites", xlab = "Area",col=c('#339900','#3399CC','#993300'), main = "")
+```
+Make conclusions about those graphics:  
+Effets trop faibles pour suggérer un colinéarité, chez males semblent y avoir plus de mites mais effet trop faible pour colinéarité  
+Si il y en avait eu on retire le facteur!
+
+## STATISTICAL ANALYSIS
+
+### Model building
+
+As said before, the response being a binary data, we will perform a Binomial Generalized Linear Models. For that statistical modelling, we will analyse the full model (model containing all independent variables to test). Remind that we will test the effects of the main effects (1 continuous and 2 categorical independent variable) and one interaction.
+
+To get the candidate model (model containing only significant terms) from the full model, we will use the **BACKWARD SELECTION MODEL**, model selection based on terms significance. Under this approach, one starts with fitting a model with all variables of interest, then the least significant variable is dropped, so long as it is not significant. We continue by successively re-fitting reduced models and applying the same rule until all remaining variables are significant. Deletion of the non-significant terms must follow the two following steps:  
+- First, you delete the non-significant interactions successively  
+- Second, you delete the non-significant main effects successively. A main effect is deleted only if it is non significant AND not contained in a significant interaction.
+
+By following these two steps, candidate model is found.
+
+```{r fullmodel,include=TRUE}
+# Model formulation
+mod1<-glm(Acarinarium~ Species
+        + Castes
+        + SQRTMites
+        + Species:SQRTMites
+        ,data=dataBombus
+        ,family=binomial(link="logit"))
+# Then we check for significance
+drop1(mod1,test="Chi")
+```
+
+This output details significance of the interaction term and the main effect not included,'Castes' . From it, we decide to keep all terms as significant. We get our candidate model.
+
+### Model's coefficients analysis
+```{r coeffm, ,include=TRUE}
+# Coefficients of the model
+summary(mod1)
+#From this output, you read the coefficients table hereafter
+
+#Coefficients:
+#                           Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)                  1.0389     1.3189   0.788 0.430868    
+#SpeciesB_opifex              4.1010     1.0617   3.863 0.000112 ***
+#Castesqueen                 16.0649  1440.6850   0.011 0.991103    
+#Castesworker                -2.4501     0.9974  -2.456 0.014032 *  
+#SQRTMites                    0.3597     0.3933   0.915 0.360338    
+#SpeciesB_opifex:SQRTMites   -0.9788     0.4081  -2.399 0.016458 * 
+```
+
+This output presents the table detailing coefficients of the model with coefficients associated with each significant main effect and the interaction. Remind that for the factor, one level is called 'the baseline' meaning that its coefficient is 0 (also called the reference level). From this table, coefficients are :   
+Problème erreur standard enorme, reine toutes porteuses des actinarium = situation triviale
+Si on modélise ce genre de situations triviales avec une variable binaire -> on peut enlever la classe. Ou si que des 0 (beaucoup beaucoup) dans la modalité, on remplace un des 0 par un 1 permet d'avoir de la variance (et on explique).
+  
+Ici on peut rajouter un 0 dans queen, pb seulement 17 reines, peut être pas assez  
+  
+  
+**Species factor**  
+- $Species_{B.atratus}$ = 0 (the baseline of the factor Location)  
+- $Species_{B.opifex}$ = $+4.10^{***}$  
+
+**Castes factor**  
+- $Castes_{Drone}$ = 0 (the baseline of the factor Location)  
+- $Castes_{Queen}$ = $+16.06^{NS}$ 
+- $Castes_{Worker}$ = $-2.45^{*}$
+
+**Mites number covariate**  
+- $\beta_{SQRTMites}$ = $+0.35^{NS}$    
+
+**Interaction**  
+- $\beta_{SQRTMites_{B.opifex}}$ = $- 0.978^{***}$  
+
+So, the candidate model is:
+$$ logit(Presence\:of\:acarinarium) = 1.03 + (B.\:atratus = 0\:;\:B.\:opifex = 4.10)$$
+$$ + (Castes_{Drone} = 0\:;\:Castes_{Queen} = 16.06\:;\:Castes_{Worker} = -2.45)$$
+$$ + 0.35.\sqrt{Number\:of\:Mites}\: +\: (if\:B.\:opifex:\: - 0.978.\sqrt{Number\:of\:Mites})$$
+
+For sake of simplicity, we write the model depending on the bumblebee species  
+
+*Model for Bombus atratus*
+$$ logit(Presence\:of\:acarinarium) = 4.45 + 0.35.\sqrt{Number\:of\:Mites}+ (Drone = 0\:;\:Queen = +16.06\:;\:Worker = -2.45)$$
+
+*Model for Bombus opifex*
+$$ logit(Presence\:of\:acarinarium) = 1.03 - 0.63.\sqrt{Number\:of\:Mites}+ (Drone = 0\:;\:Queen = +16.06\:;\:Worker = -2.45)$$
+```{r lines, include=TRUE, fig.height=5, fig.width=5}
+#R code from Zuur et al. Example of Binary data
+
+MyData <- expand.grid(SQRTMites = seq(0, 9.5, length = 25),
+                      Species = levels(dataBombus$Species),
+                      Castes = levels(dataBombus$Castes))
+MyData$P <- predict(mod1, newdata = MyData, 
+                    type = "response")
+
+xyplot(Acarinarium ~ SQRTMites| Species * Castes,
+       data = dataBombus,
+       xlab = "Total Mites",
+       ylab = "Probability of Acarinarium",
+       panel = function(x,y, subscripts,...)
+         {
+         panel.points(x,y, pch = 16, col =1)
+         print(dataBombus$Castes[subscripts][1])
+         print(dataBombus$Species[subscripts][1])
+         i <- dataBombus$Castes[subscripts][1]
+         j <- dataBombus$Species[subscripts][1]
+         Data.ij <- subset(MyData,
+                           Castes == i &
+                           Species == j)
+         panel.lines(Data.ij$SQRTMites, 
+                     Data.ij$P, 
+                     col = 'red1', lty = 1, lwd = 2)
+                  })
+```
+**Not done here** : Castes factor has a significant effect on the probability of presence of acarinarium in bumblebees. We may be then interested in knowing exactly which levels of this factor differ from one another, and which do not. Remember that a significant $p$ value in the model would reject the null hypothesis the means were the same across all factor levels, but not identify which were different from each other. Here, we have one factor with 3 levels and see 'General Linear Model ANOVA Outreman.Rmd' to see how detect levels that differ from others.
+
+### Model explanation
+
+Remind that there is no R² in Generalized Linear Models. A way to analyse how models fits is to determine how the candidate model is far from the null model. For this purpose, we calculate a *pseudo R²* by determining the distance between the deviance of the null model and the residual deviance of the candidate model. 
+See the output of the model summary.
+
+```{r deviance, include=TRUE}
+# Estimate of deviance explained
+(mod1$null.deviance-mod1$deviance)/mod1$null.deviance
+
+# Some others estimates of deviance explained - package 'rcompanion'
+nagelkerke(mod1)
+```
+
+From the model's summary output, the null deviance = 119.99 and the residual deviance = 72.80. To estimate the deviance explained, we used the following formula:  
+$$Pseudo\:R^2=100\:.\:\frac{Null\:Deviance- Residual\:Deviance}{Null\:Deviance}$$
+So, the estimate of deviance explained is 39%. 
+
+By using, other $Pseudo\:R^2$ estimate (package 'rcompanion'), we found about 39%.
+
+## MODEL VALIDATION: CHECK TO ASSUMPTIONS
+
+The assumptions of Generalized Linear Model are limited: *independence of residuals*. Additionally, you can check presence of influential observations (i.e. statistical units having a too large contribution to model).
+
+### Residuals analysis
+
+The assumptions of residuals normality and homogeneity are not expected in GLM. But we can have a look on residuals. By plotting residuals against covariates in the model, we must check absence of patterns in residuals. We do not want to see any patterns in these graphs. If we do, then there is something wrong. This may be due to lack of fit, dependency in data or influential observations. In GLM, we use Pearson residuals as they include variance heterogeneity. Also, Pearson residuals are the easiest to understand, and can easily be calculated. 
+
+```{r ResidNB, include=TRUE, fig.height=8, fig.width=6}
+
+resid<-residuals(mod1, type="pearson")
+
+par(mfrow=c(3,2))
+# Histogram
+hist(resid,col='blue',xlab="residuals",main="")
+# Quantile-Quantile plot
+qqnorm(resid,pch=16,col='blue',xlab='')
+qqline(resid,col='red')
+
+# residuals vs fitted
+plot(resid~fitted(mod1)
+      , col='blue'
+      , pch=16)
+abline(h = 0)
+
+# residuals against Species factor
+boxplot(resid~ dataBombus$Species, 
+         varwidth = TRUE,
+         ylab = "Residuals",
+         xlab = "Species",
+         main = "")
+abline(h = 0)
+
+# residuals against Castes factor
+boxplot(resid~ dataBombus$Castes, 
+         varwidth = TRUE,
+         ylab = "Residuals",
+         xlab = "Castes",
+         main = "")
+abline(h = 0)
+
+
+# residuals against Number of mites
+plot(resid~ dataBombus$SQRTMites, 
+         pch=16,
+         col="blue",
+         ylab = "Residuals",
+         xlab = "Number of Mites",
+         main = "")
+abline(h = 0)
+```
+
+In Binomial GLM, residuals graphs are difficult to interpret, unless you have lots of observations...
+
+### Look at influential observations
+```{r Contri, include=TRUE, fig.height=4, fig.width=4}
+par(mfrow = c(1, 1))
+plot(cooks.distance(mod1), type = "h", ylim = c(0, 1))
+abline(h = 1, col = 2,lwd = 3)
+```
+Make conclusion about presence of influential observations.
+
+### Performing simulations to check adequacy of the model
+
+```{r Simul, include=TRUE, fig.height=4, fig.width=4}
+
+# We could do a simulation
+N    <- nrow(dataBombus)
+Pi   <- fitted(mod1)
+dataBombus$Ysim <- rbinom(N, size = 1, Pi)
+# Classification table
+Z <- table(dataBombus$Acarinarium, dataBombus$Ysim) / N
+rownames(Z) <- c("Observed 0", "Observed 1")
+colnames(Z) <- c("Predicted 0", "Predicted 1")
+Z
+#Correctly classified:
+sum(diag(Z))
+
+# And repeat this 1000 times, store the results and calculate an average classification table
+
+Pi   <- fitted(mod1)
+N    <- nrow(dataBombus)					
+NSim <- 1000                           
+diagZ<- matrix(nrow = N, ncol = NSim)
+for (i in 1:NSim) {
+  Ysim <- rbinom(N, size = 1, Pi)
+  Z<- table(dataBombus$Acarinarium, Ysim) / N
+  diagZ[,i]<-sum(diag(Z))
+  }
+#Average rate of individuals well-classified by the model
+boxplot(diagZ[2,], col='blue',ylab='#Rate of bumble bees well-classified')
+mean(diagZ[2,])
+```
+About 75% of good predictions!
+
+## CONCLUSIONS
+
+**So, which conclusions about this modelling? Good or not ?**
