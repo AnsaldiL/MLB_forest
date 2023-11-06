@@ -75,8 +75,6 @@ pcaXforest <- PCA(Xforest, ncp = 2)
 
 ## Méthodes testées
 
-Insérer le schéma de Lucia !
-
 
 ![](C:/Users/lucia/OneDrive/Documents/M2/Cours/MLB/GITHUB_MLB/MLB_forest/Demarche.jpg)
 
