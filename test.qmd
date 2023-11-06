@@ -77,6 +77,9 @@ pcaXforest <- PCA(Xforest, ncp = 2)
 
 Insérer le schéma de Lucia !
 
+
+![](C:/Users/lucia/OneDrive/Documents/M2/Cours/MLB/GITHUB_MLB/MLB_forest/Demarche.jpg)
+
 ## Data driven algorithms
 
 -   K-means
