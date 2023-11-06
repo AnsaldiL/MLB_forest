@@ -1,5 +1,0 @@
-"0","par(mfrow=c(2,3))"
-"0","for (i in 1:10) {"
-"0","  # Cleveland plot"
-"0","  boxplot(forest[,i],pch=16,col='salmon',xlab=colnames(forest)[i])"
-"0","}"

@@ -1,2 +1,0 @@
-"0","quali <- apply(forest[,11:54], MARGIN = 2, table)"
-"0","print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),optional = TRUE ))"
