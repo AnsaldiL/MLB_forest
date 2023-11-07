@@ -26,11 +26,6 @@ Données issues utilisées dans une étude de Blackard et Dean, publiée en 1999
 
 Le jeu de donné regroupe des données pédologiques et cartographique ainsi que la catégorie de couvert forestier.
 
-```{r}
-forest= read.table(file = "covtype.data", sep=",", header=TRUE) 
-str(forest)
-```
-
 ```{r echo = FALSE, include=FALSE}
 library(tidyverse)
 library(dplyr)
@@ -45,6 +40,8 @@ library(partykit)
 library(caret)
 library(randomForest)
 library(randomForestExplainer)
+
+forest = read.table(file = "covtype.data", sep=",", header=TRUE) 
 
 a <- rep("Soil_Type_",40)
 for (i in 1:40) {
@@ -73,15 +70,19 @@ Xforest <- subset(forest, select = -Cover_Type)
 pcaXforest <- PCA(Xforest, ncp = 2) 
 ```
 
+```{r}
+str(forest)
+```
+
 ## Méthodes testées
 
-![](\Demarche.jpg)
+![](%5CDemarche.jpg)
 
 ## Data driven algorithms
 
 -   K-means
 
--   K-nearest neighbourg
+-   K-nearest neighbourgs
 
 -   Decision tree
 
@@ -195,7 +196,8 @@ freq_cover <- table(forest$Cov_Type)/length(forest$Cov_Type) # en proportions
 
 
 ```
-### Utiliser les fréquences de chaque classes 
+
+### Utiliser les fréquences de chaque classes
 
 ```{r dataY, include=TRUE}
 table(forest$Cover_Type)
@@ -587,24 +589,22 @@ plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB"
 
 -   Simulation longue mais qui augmente la précision des prédictions
 
+======= \## Methodes model-driven
 
-=======
-## Methodes model-driven
+-   Modèle multinomial
 
-- Modèle multinomial
-
-- Réseau de neuronne 
+-   Réseau de neuronne
 
 ### Formalisme du modèle multinomial:
 
 $$ Cover \: type \: \sim \: Elevation \: + \: Aspect \: + \: Slope \: + \: ... \: + \: Soil \: type \: 40$$
 
-$Y = Cover \: type$, la variable réponse \
-$Xs$ les variables prédictives \
+$Y = Cover \: type$, la variable réponse\
+$Xs$ les variables prédictives\
 
-### Valeurs extremes de $X$ 
+### Valeurs extremes de $X$
 
-```{r dataCov, include=TRUE}
+```{r dataCov1, include=TRUE}
 par(mfrow=c(2,3))
 for (i in 1:10) {
   # Cleveland plot
@@ -616,11 +616,13 @@ for (i in 1:10) {
 Les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
 
 ### Répartition des individus pour les variables qualitatives
+
 ```{r}
 quali <- apply(forest[,11:54], MARGIN = 2, table)
 print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),optional = TRUE ))
 ```
-En calculant le pourcentage des observations appartenant à chaque classe de "Wilderness area" et de "Soil type, on remarque que Wilderness area 2 et 4 ne représentent respectivement que 5.1 et 6.4 % des observations.  \
+
+En calculant le pourcentage des observations appartenant à chaque classe de "Wilderness area" et de "Soil type, on remarque que Wilderness area 2 et 4 ne représentent respectivement que 5.1 et 6.4 % des observations.\
 \
 
 Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numero 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
@@ -629,7 +631,7 @@ Pour les types de sols, on remarque que la plupart sont assez peu représentés 
 
 Première estimation des relations possibles entre les variables quantitatives explicatives et la variable réponse.
 
-```{r dataCov, include=TRUE, fig.height=3, fig.width=8}
+```{r dataCov2, include=TRUE, fig.height=3, fig.width=8}
 # variables X quantitatives
 par(mfrow=c(1,2))
 for (i in 1:10) {
@@ -656,7 +658,7 @@ temp_forest <- temp_forest[,-c(12,14)]
 #MOCHE
 ```
 
-Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal. 
+Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
 
 ### Analyse des interactions entre les variables X
 
@@ -680,15 +682,14 @@ for (i in 1:10) {
 
 ```
 
+Interactions between qualitative X and quantitative + orhtogonality of the plan studied in another file to avoid importing multiple datasets every time
 
-Interactions between qualitative X and quantitative + orhtogonality of the plan studied in another file to avoid importing multiple datasets every time 
-
-Interactions potentielles :  \
-- Horizontal distance to fire, Wilderness area  
-- Horizontal distance to Roadway, Wilderness area  
-- Slope, Wilderness area  
-- Slope, soil type  
-- Elevation, Wilderness area  
+Interactions potentielles :\
+- Horizontal distance to fire, Wilderness area\
+- Horizontal distance to Roadway, Wilderness area\
+- Slope, Wilderness area\
+- Slope, soil type\
+- Elevation, Wilderness area
 
 ### Analyse des corrélations entre les X quantitatifs
 
@@ -707,17 +708,15 @@ Xforest_red_cr <- Xforest_red
 Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,center = TRUE, scale = TRUE))
 ```
 
-
 ## Modèle
 
-- Le modèle linéaire ne peut pas tourner sur 387341 données, donc on fait plusieurs fois tourner sur environ 7000 données. Dans l'idéal on le fait tourner environ 550 fois pour que le total des données d'entraînement représente environ 2/3 des données. \
-   
-- Le plan n'est pas orthogonal, on n'utilise pas d'interactions ou alors on en utilise mais on fait attention aux paramètres des interactions (Beta) qui peuvent être moins fiables surtout sur les modalités rares dans l'interprétation (en calculant la variance des Beta pour un ensemble de modèles crées). \
-  
-- On sélectionne les variables en ajouttant une pénalité lasso au modèle. 
-  
-- Pour tester la qualité du modèle on s'intéresse à l'accuracy moyenne, soit le nombre moyen de cover types correctement prédits sur l'ensemble des modèles simulés divisé par le nombre total de cover type testé.
+-   Le modèle linéaire ne peut pas tourner sur 387341 données, donc on fait plusieurs fois tourner sur environ 7000 données. Dans l'idéal on le fait tourner environ 550 fois pour que le total des données d'entraînement représente environ 2/3 des données.\
 
+-   Le plan n'est pas orthogonal, on n'utilise pas d'interactions ou alors on en utilise mais on fait attention aux paramètres des interactions (Beta) qui peuvent être moins fiables surtout sur les modalités rares dans l'interprétation (en calculant la variance des Beta pour un ensemble de modèles crées).\
+
+-   On sélectionne les variables en ajouttant une pénalité lasso au modèle.
+
+-   Pour tester la qualité du modèle on s'intéresse à l'accuracy moyenne, soit le nombre moyen de cover types correctement prédits sur l'ensemble des modèles simulés divisé par le nombre total de cover type testé.
 
 ### Ecriture du modèle
 
@@ -808,14 +807,13 @@ T2<-Sys.time()
 
 
 ```
-Plusieurs difficultés ont été rencontrées lors de cette étape: \
-1- Comment choisir la pénalité lasso: test avec l'AIC, le BIC, otimisation par R basée sur ... \
-2- Combien d'intéractions intégrer dans le modèle, plus il y avait d'intéractions, plus le temps de calcul augmentait. Nous avons sélectionnées quelques interactions en exemple \
-3- Commment faire l'échantillonnage 
 
+Plusieurs difficultés ont été rencontrées lors de cette étape:\
+1- Comment choisir la pénalité lasso: test avec l'AIC, le BIC, otimisation par R basée sur ...\
+2- Combien d'intéractions intégrer dans le modèle, plus il y avait d'intéractions, plus le temps de calcul augmentait. Nous avons sélectionnées quelques interactions en exemple\
+3- Commment faire l'échantillonnage
 
-
-Calculer le pourcentage de bonne prédiction moyen par les modèle entrainés sur différents jeux de données d'entrainement, premiere colonne pour l'ensemble des données, puis pourcentage de 1 prédits qui étaient vraiment des 1  et le pourcentage 1 prédits parmis toutes les valeurs où 1 devait etre prédit
+Calculer le pourcentage de bonne prédiction moyen par les modèle entrainés sur différents jeux de données d'entrainement, premiere colonne pour l'ensemble des données, puis pourcentage de 1 prédits qui étaient vraiment des 1 et le pourcentage 1 prédits parmis toutes les valeurs où 1 devait etre prédit
 
 ```{r}
 res <- matrix(apply(accuracy,2,mean),nrow = 1)
@@ -824,7 +822,6 @@ res
 ```
 
 Malgrès que des classes soient très peu représentés dans le jeu de donnée, en équilibrant l'échantillonnage, on peut voir que ces classes sont tout de même prédites dans le modèle. Mais le problème est qu'elles sont sur-représentées dans les sorties du modèle. Par exemple le modèle a détecté correctement 77.7% des cover-type 4 qui était dans le jeu de données d'entrainement. Cependant seulement 15% des individus prédits dans le cover type 4 étaient corrects, cela signifie que de trop d'individus ont été classé dans le type 4. Ce constat vaut pour les classes 5,6 et 7 qui sont toutes plutôt rares.
-
 
 On regarde les variables qui ressortent moins de 80% des fois
 
@@ -849,7 +846,15 @@ for (i in 1:7) {
 ```
 
 En plus de la variable ombre à 3 heures.
->>>>>>> 1011bf8bed186525c13393a3e2bad4a03663d85d
 
+## Comparaison des méthodes et conclusion
 
+\--\> ça sera à classer par ordre croissant d'accuracy :)
 
+| Méthode | Accurracy   | Remarque                                |
+|---------|-------------|-----------------------------------------|
+| K-means | 0.55        | toutes les classes ne sont pas prédites |
+| K-NN    | 0.37 à 0.57 |                                         |
+|         |             |                                         |
+|         |             |                                         |
+|         |             |                                         |
