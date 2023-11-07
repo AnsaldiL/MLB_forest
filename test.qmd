@@ -263,8 +263,6 @@ for (b in 1:B){
   y_test = c(y_test,C[itest])
 }
 
-#multiclass.roc(y_test, y_prob, level = 7, plot=TRUE) #interet de la courbe ROC..?
-
 Cres <- C[itest]
 
 conf_mat_knn = (conf_mat = table(Cres, knn_res, dnn=list("Predicted", "Observed")))
@@ -516,7 +514,7 @@ rf$importance
 
 -   78% d'accuracy pour les prédictions
 
--   Les variables Sol_type peuvent être negliger pour l'analyse
+-   Les variables Sol_type peuvent être negligée pour l'analyse
 
 -   Maintenant que l'on la méthode la plus efficace on peut tester l'algorithme sur le jeu de données complet
 
@@ -589,7 +587,7 @@ plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB"
 
 -   Simulation longue mais qui augmente la précision des prédictions
 
-======= \## Methodes model-driven
+    ##  Methodes model-driven
 
 -   Modèle multinomial
 
@@ -851,10 +849,10 @@ En plus de la variable ombre à 3 heures.
 
 \--\> ça sera à classer par ordre croissant d'accuracy :)
 
-| Méthode | Accurracy   | Remarque                                |
-|---------|-------------|-----------------------------------------|
-| K-means | 0.55        | toutes les classes ne sont pas prédites |
-| K-NN    | 0.37 à 0.57 |                                         |
-|         |             |                                         |
-|         |             |                                         |
-|         |             |                                         |
+| Méthode | Accurracy   | Remarques                                  |
+|---------|-------------|--------------------------------------------|
+| K-means | 0.55        | Toutes les classes ne sont pas prédites... |
+| K-NN    | 0.37 à 0.57 | Résulats moyens                            |
+|         |             |                                            |
+|         |             |                                            |
+|         |             |                                            |
