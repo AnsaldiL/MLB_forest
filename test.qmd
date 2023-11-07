@@ -854,5 +854,10 @@ En plus de la variable ombre à 3 heures.
 | K-means | 0.55        | Toutes les classes ne sont pas prédites... |
 | K-NN    | 0.37 à 0.57 | Résulats moyens                            |
 |         |             |                                            |
-|         |             |                                            |
-|         |             |                                            |
+|Decision tree         | 0.72 à 0.87            |                                            |
+| Random forest      | 0.78 à 0.98            |                                            |
+
+
+IDEE CONCLU:
+- Pour les datas driven methods: + de données = + accuracy
+- Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
