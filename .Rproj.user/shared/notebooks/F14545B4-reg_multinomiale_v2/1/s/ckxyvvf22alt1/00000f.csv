@@ -1,0 +1,4 @@
+"0","# Number of 0 and 1 in Y"
+"0","table(Cov_type$Cover_Type)"
+"2","Erreur dans Cov_type$Cover_Type : $ operator is invalid for atomic vectors
+"
