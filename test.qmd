@@ -16,7 +16,6 @@ Prédiction des couverts forestiers à partir de variables cartographiques.
 
 ## Pourquoi utiliser le **machine learning** ?
 
-
 -   Pour répertorier le couvert
 
 -   Eviter le déplacement de technicien.ne.s sur place
@@ -590,20 +589,20 @@ plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB"
 
 -   Simulation longue mais qui augmente la précision des prédictions
 
-    ##  Methodes model-driven
+# Methodes model-driven
 
 -   Modèle multinomial
 
 -   Réseau de neuronne
 
-### Formalisme du modèle multinomial:
+## Formalisme du modèle multinomial:
 
 $$ Cover \: type \: \sim \: Elevation \: + \: Aspect \: + \: Slope \: + \: ... \: + \: Soil \: type \: 40$$
 
 $Y = Cover \: type$, la variable réponse\
 $Xs$ les variables prédictives\
 
-### Valeurs extremes de $X$
+## Valeurs extremes de $X$
 
 ```{r dataCov1, include=TRUE}
 par(mfrow=c(2,3))
@@ -616,7 +615,7 @@ for (i in 1:10) {
 
 Les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
 
-### Répartition des individus pour les variables qualitatives
+## Répartition des individus pour les variables qualitatives
 
 ```{r}
 quali <- apply(forest[,11:54], MARGIN = 2, table)
@@ -628,7 +627,7 @@ En calculant le pourcentage des observations appartenant à chaque classe de "Wi
 
 Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numero 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
 
-### Relations entre X & Y
+## Relations entre X & Y -\> en haut
 
 Première estimation des relations possibles entre les variables quantitatives explicatives et la variable réponse.
 
@@ -649,19 +648,11 @@ temp_forest <- pivot_longer(temp_forest,cols = seq(15,54),names_to = "Soil_type"
 temp_forest <- pivot_longer(temp_forest,cols = seq(11,14),names_to = "Wilderness_area",values_to = "pres_ab", values_drop_na = TRUE)
 temp_forest <- temp_forest[,-c(12,14)]
 
-# par(mfrow=c(1,1))
-# mosaicplot(Cov_type~temp_forest$Soil_type
-#            ,main="relation Cover type & Soil type")
-# 
-# mosaicplot(Cov_type~temp_forest$Wilderness_area
-#            ,main="relation Cover type & Wilderness area")
-# 
-#MOCHE
 ```
 
 Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
 
-### Analyse des interactions entre les variables X
+## Analyse des interactions entre les variables X
 
 ```{r}
 
@@ -692,7 +683,7 @@ Interactions potentielles :\
 - Slope, soil type\
 - Elevation, Wilderness area
 
-### Analyse des corrélations entre les X quantitatifs
+## Analyse des corrélations entre les X quantitatifs
 
 ```{r}
 M<-cor(Xforest[,1:10])
@@ -702,7 +693,7 @@ Xforest_red <- Xforest[,-9]
 
 L'ombre à 3h est corrélée avec un coefficient r=-0.78 avec l'ombre à 9h. Si on prend un seuil à 0.7 on retire cette l'ombre à 3h arbitrairement.
 
-### Centrer et réduire les variables quantitatives
+## Centrer et réduire les variables quantitatives
 
 ```{r}
 Xforest_red_cr <- Xforest_red
@@ -719,7 +710,7 @@ Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,
 
 -   Pour tester la qualité du modèle on s'intéresse à l'accuracy moyenne, soit le nombre moyen de cover types correctement prédits sur l'ensemble des modèles simulés divisé par le nombre total de cover type testé.
 
-### Ecriture du modèle
+## Ecriture du modèle
 
 On utilise une fonction qui calcule automatiquement la valeur du tuning parameter pour la pénalité lasso
 
@@ -852,15 +843,12 @@ En plus de la variable ombre à 3 heures.
 
 \--\> ça sera à classer par ordre croissant d'accuracy :)
 
-| Méthode | Accurracy   | Remarques                                  |
-|---------|-------------|--------------------------------------------|
-| K-means | 0.55        | Toutes les classes ne sont pas prédites... |
-| K-NN    | 0.37 à 0.57 | Résulats moyens                            |
-|         |             |                                            |
-|Decision tree         | 0.72 à 0.87            |                                            |
-| Random forest      | 0.78 à 0.98            |                                            |
+| Méthode       | Accurracy   | Remarques                                  |
+|---------------|-------------|--------------------------------------------|
+| K-means       | 0.55        | Toutes les classes ne sont pas prédites... |
+| K-NN          | 0.37 à 0.57 | Résulats moyens                            |
+|               |             |                                            |
+| Decision tree | 0.72 à 0.87 |                                            |
+| Random forest | 0.78 à 0.98 |                                            |
 
-
-IDEE CONCLU:
-- Pour les datas driven methods: + de données = + accuracy
-- Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
+IDEE CONCLU: - Pour les datas driven methods: + de données = + accuracy - Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
