@@ -12,7 +12,10 @@ format:
 
 Prédiction des couverts forestiers à partir de variables cartographiques.
 
-Pourquoi utiliser le **machine learning** ?
+![](C:/Users\lucia\OneDrive\Documents\M2\Cours\MLB\GITHUB_MLB\MLB_forest\couverture.jpg)
+
+## Pourquoi utiliser le **machine learning** ?
+
 
 -   Pour répertorier le couvert
 
