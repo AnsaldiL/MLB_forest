@@ -1,0 +1,2 @@
+"0","M<-cor(Xforest[,1:10])"
+"0","corrplot.mixed(M,upper=""square"",lower.col=""black"", tl.col=""black"",cl.cex = 0.7,tl.cex = 0.6,number.cex =0.7)"

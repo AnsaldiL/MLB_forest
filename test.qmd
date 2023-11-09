@@ -12,7 +12,7 @@ format:
 
 Prédiction des couverts forestiers à partir de variables cartographiques.
 
-![](C:/Users\lucia\OneDrive\Documents\M2\Cours\MLB\GITHUB_MLB\MLB_forest\couverture.jpg)
+![](\couverture.jpg)
 
 ## Pourquoi utiliser le **machine learning** ?
 
@@ -39,7 +39,7 @@ library(corrplot)
 library(glmnet) # multinomiale avec pénalité lasso
 library(rpart)
 library(partykit)
-library(caret)
+#library(caret)
 library(randomForest)
 library(randomForestExplainer)
 
@@ -69,7 +69,7 @@ name <- c("Elevation",
 colnames(forest)<- name
 Cov_type = forest$Cover_Type
 Xforest <- subset(forest, select = -Cover_Type)
-pcaXforest <- PCA(Xforest, ncp = 2) 
+#pcaXforest <- PCA(Xforest, ncp = 2) 
 ```
 
 ```{r}
@@ -78,7 +78,7 @@ str(forest)
 
 ## Méthodes testées
 
-![](%5CDemarche.jpg)
+![](Demarche.jpg)
 
 ## Data driven algorithms
 
@@ -178,13 +178,13 @@ part_data <- function(data,freq){
   }
   
   # on force l'echantillon d'entrainement à avoir au moins 1000 observations par type de recouvrement végétal
-  nb <- freq*7000
+  nb <- freq*4000
   for (i in 1:7) {
     itrain <- c(itrain,sample(x = setdiff(which(data$Cover_Type == i),itrain),size = nb[i]))
   }
   
   itest <- setdiff(itest,itrain)
-  itest <- sample(itest,3560) 
+  itest <- sample(itest,2066) 
   
   return(list(itrain,itest))
 
@@ -596,7 +596,7 @@ $$ Cover \: type \: \sim \: Elevation \: + \: Aspect \: + \: Slope \: + \: ... \
 $Y = Cover \: type$, la variable réponse\
 $Xs$ les variables prédictives\
 
-## Valeurs extremes de $X$
+## Valeurs extremes de $X$ -> en haut
 
 ```{r dataCov1, include=TRUE}
 par(mfrow=c(2,3))
@@ -609,7 +609,7 @@ for (i in 1:10) {
 
 Les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
 
-## Répartition des individus pour les variables qualitatives
+## Répartition des individus pour les variables qualitatives -> en haut 
 
 ```{r}
 quali <- apply(forest[,11:54], MARGIN = 2, table)
@@ -632,7 +632,15 @@ for (i in 1:10) {
   boxplot(Xforest[,i]~Cov_type,ylab=colnames(Xforest)[i],xlab = "Cover type")
 }
 
+```
 
+Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
+
+plotter dans quarto : i = 1 et 6 les variables ou var semble avoir le plus d'impact
+
+## Analyse des interactions entre les variables X
+
+```{r}
 # variables X qualitatives
 temp_forest <- Xforest
 temp_forest[,11:54][temp_forest[,11:54] == 0] <- NA
@@ -642,21 +650,6 @@ temp_forest <- pivot_longer(temp_forest,cols = seq(15,54),names_to = "Soil_type"
 temp_forest <- pivot_longer(temp_forest,cols = seq(11,14),names_to = "Wilderness_area",values_to = "pres_ab", values_drop_na = TRUE)
 temp_forest <- temp_forest[,-c(12,14)]
 
-```
-
-Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
-
-## Analyse des interactions entre les variables X
-
-```{r}
-
-
-# Interactions possibles entre between les variables qualitatives
-table(temp_forest$Wilderness_area,temp_forest$Soil_type)
-################################
-# JCP SI ON EN DEDUIT QQCH ????
-#################################
-
 # Interactions possibles entre les variables qualitatives et quantitatives
 
 for (i in 1:10) {
@@ -664,6 +657,8 @@ for (i in 1:10) {
   boxplot(temp_forest[,i]~temp_forest$Wilderness_area, varwidth = TRUE, ylab = colnames(temp_forest)[i], xlab = "Wilderness area", main = "", xaxt = "n")
  boxplot(temp_forest[,i]~temp_forest$Soil_type, varwidth = TRUE, ylab = colnames(temp_forest)[i], xlab = "Soil type ", main = "", xaxt = "n")
 }
+
+rm(temp_forest)
 
 
 ```
@@ -706,21 +701,21 @@ Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,
 
 ## Ecriture du modèle
 
-On utilise une fonction qui calcule automatiquement la valeur du tuning parameter pour la pénalité lasso
+On utilise une fonction qui optimize automatiquement la valeur du tuning parameter pour la pénalité lasso.
 
 ```{r fullmodel,include=TRUE}
 
 
-rep <- 10 #normalement sur 550 essais mais tournerait environ 36 heures
+rep <- 10 #normalement sur 550 essais mais tournerait trop longtemps
 L_coeffs <- list()
-accuracy <- matrix(NA,nrow = rep,ncol = 15)
+prediction <- matrix(NA,nrow = 2066,ncol = rep*2)
 
 
 T1<-Sys.time()
 for (b in 1:rep) { 
   # subset de données 
   set.seed(b)
-  select_indiv <- part_data(forest)
+  select_indiv <- part_data(forest,freq_cover)
   Ytrain <- Cov_type[select_indiv[[1]]] 
   Ytest <- Cov_type[select_indiv[[2]]] 
   Xtrain <- Xforest_red_cr[select_indiv[[1]],] 
@@ -772,18 +767,10 @@ for (b in 1:rep) {
   L_coeffs[[b]] <- coef(mod, s = "lambda.min") #on choisit la pénalité lasso optimale pour le modèle basé sur 
   
   # prédictions du modèle
-  ychap <- predict(mod, Xtest_inter,type = "class",s = "lambda.min")
-  
-  #le modèle fai-il de bonne predictions
-  acc <- 100*length(which(ychap == Ytest))/3560#on compte le nombre de fois où l'algorithme prédit le bon cover type
-  
-  for (i in 1:7) {
-    acc<- c(acc,
-            100*length(which(ychap == Ytest & Ytest == i))/length(which(ychap == i)),
-            100*length(which(ychap == Ytest & Ytest == i))/length(which(Ytest == i)))
-    
-  }
-  accuracy[b,] <- acc
+  prediction[,b] <- predict(mod, Xtest_inter,type = "class",s = "lambda.min")
+  prediction[,(rep*2-b+1)] <- Ytest
+
+
 
 }
 
@@ -794,25 +781,78 @@ T2<-Sys.time()
 
 ```
 
-Plusieurs difficultés ont été rencontrées lors de cette étape:\
-1- Comment choisir la pénalité lasso: test avec l'AIC, le BIC, otimisation par R basée sur ...\
-2- Combien d'intéractions intégrer dans le modèle, plus il y avait d'intéractions, plus le temps de calcul augmentait. Nous avons sélectionnées quelques interactions en exemple\
+Plusieurs difficultés ont été rencontrées lors de cette étape: \ 
+1- Comment choisir la pénalité lasso: test avec l'AIC, le BIC, otimisation par R basée sur ... \ 
+2- Combien d'intéractions intégrer dans le modèle, plus il y avait d'intéractions, plus le temps de calcul augmentait. Nous avons sélectionnées quelques interactions en exemple \ 
+3- Comment interpréter les interactions sachant que le plan n'est pas orthogonnal \ 
 3- Commment faire l'échantillonnage
 
 Calculer le pourcentage de bonne prédiction moyen par les modèle entrainés sur différents jeux de données d'entrainement, premiere colonne pour l'ensemble des données, puis pourcentage de 1 prédits qui étaient vraiment des 1 et le pourcentage 1 prédits parmis toutes les valeurs où 1 devait etre prédit
 
 ```{r}
-res <- matrix(apply(accuracy,2,mean),nrow = 1)
-colnames(res) <- c("mean_accuracy","cov_type1a","cov_type1b","cov_type2a","cov_type2b","cov_type3a","cov_type3b","cov_type4a","cov_type4b","cov_type5a","cov_type5b","cov_type6a","cov_type6b","cov_type7a","cov_type7b")
-res
+
+df_mod <- matrix(c(rep(seq(1,7),7),
+                   rep(1,7),
+                   rep(2,7),
+                   rep(3,7),
+                   rep(4,7),
+                   rep(5,7),
+                   rep(6,7),
+                   rep(7,7),rep(0,49)),byrow = FALSE,nrow = 49,ncol = 3)
+df_mod <- as.data.frame(df_mod)
+colnames(df_mod) <- c("Observed","Predicted","Freq")
+
+confusion_mod <- NA
+accuracy_mod <- c()
+
+for (i in 1:rep) {
+  mean_accuracy <- 0
+  
+  confusion_mod = as.data.frame((conf_mat = table(prediction[,((rep*2)-i+1)],prediction[,i], dnn=list("Observed","Predicted"))))
+  confusion_mod$Observed <- as.numeric(confusion_mod$Observed)
+  confusion_mod$Predicted <- as.numeric(confusion_mod$Predicted)
+  for (j in 1:max(confusion_mod$Observed)) {
+    for (k in 1:max(confusion_mod$Predicted)) {
+      df_mod[df_mod$Observed == j & df_mod$Predicted == k,3] <- df_mod[df_mod$Observed == j & df_mod$Predicted == k,3]+ confusion_mod[confusion_mod$Observed == j & confusion_mod$Predicted == k,3]
+      df_mod <- as.data.frame(df_mod)
+    }
+    #calcul de l'accuracy
+    mean_accuracy <- mean_accuracy + confusion_mod[confusion_mod$Observed==j & confusion_mod$Predicted==j,3]
+    }
+    accuracy_mod<-c(accuracy_mod,mean_accuracy/2066)
+    
+  
+}
+df_mod_pourc<-df_mod
+df_mod_pourc$Freq <-df_mod_pourc$Freq/rep
+  
+ggplot(df_mod_pourc, aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="red")+
+  coord_fixed()+
+  theme_minimal()+ggtitle("Matrice de confusion moyenne modèle multinomiale")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+print(paste("Sur dix répétitions, l'accuracy est de :", mean(accuracy_mod)," et d'écart type, ", sd(accuracy_mod)))
+
+
+
 ```
+
+Il semble y avoir beaucoup de confusion entre les classes 1,2 et 7. La classe 3 est plutôt bien prédite. Les classes les plus rares sont mal prédites: 4 est assignée à de nombreuses autres classes, 5 est assignée à la classe 2 et 6 aux classes 2 et 3. 
 
 Malgrès que des classes soient très peu représentés dans le jeu de donnée, en équilibrant l'échantillonnage, on peut voir que ces classes sont tout de même prédites dans le modèle. Mais le problème est qu'elles sont sur-représentées dans les sorties du modèle. Par exemple le modèle a détecté correctement 77.7% des cover-type 4 qui était dans le jeu de données d'entrainement. Cependant seulement 15% des individus prédits dans le cover type 4 étaient corrects, cela signifie que de trop d'individus ont été classé dans le type 4. Ce constat vaut pour les classes 5,6 et 7 qui sont toutes plutôt rares.
 
 On regarde les variables qui ressortent moins de 80% des fois
 
 ```{r}
-occurence_var <- matrix(0,nrow = 54,ncol=7) # contient en ligne la somme des coefficients Beta non nuls au cours des répétitions du modele pour chaque classe en colonne
+occurence_var <- matrix(0,nrow = 70,ncol=7) # contient en ligne la somme des coefficients Beta non nuls au cours des répétitions du modele pour chaque classe en colonne
 
 for (i in 1:rep) {
   for (j in 1:7) {
@@ -824,24 +864,62 @@ for (i in 1:rep) {
 occurence_var_pourcent <- apply(occurence_var, c(1,2), function(X) X*100/rep)
 occurence_inf80 <- list()
 for (i in 1:7) {
-  occurence_inf80[[i]] <- c("intercept",colnames(Cov_red))[which(occurence_var_pourcent[,i]<80)]
-  print(occurence_inf80[[i]])
+  occurence_inf80[[i]] <- c("intercept",row.names(L_coeffs[[1]]$`1`))[which(occurence_var_pourcent[,i]<80)]
 }
 
 
 ```
 
-En plus de la variable ombre à 3 heures.
+
+![](\selectvar.png)
+Représentées en bleu, les variables qui entrent en compte dans la prédiction des types de couvertures (de 1 à 7) au  moins 80% des fois, en rouge les autres. La colonne de droite correspond aux variables utilisées dans l'algorithme de random forest, en rouge celle dont la contribution est < à XXX et en bleu celle dont elle est supérieure à XXX. Les variables en plus claires représentent les variables propres à la régression linéaire soit: les interactions et l'intercept. \ 
+  
+  
+
+Pour le modèle linéaire, les variables semblent quasiment toutes jouer un rôle dans la prédiction d'au moins une des classes, excepté les variables de type de sol 26 et 28, et l'interaction entre Horizontal distance to roadway et wilderness area?. Sans oublier la variable ombre à 3 heures retirée précedemment.  
+Trois variables ont de l'importance pour au moins 5 des type de couvert: horizontal distance to roadway, ainse que les intéractions elevation:wilderness area 2 et horizontal distance to roadway: wilderness area 4. \ 
+
+On ne remarque pas de motif particulier dans les variables importantes et pas de similitude avec les variables sélectionnées par le random forest.
+
+
+
+## attention à l'interprétation des coefficients d'intéractions
+
+Pour les deux intéractions importantes, on regarde si les coefficients varient selon les simulations. On fait attention à cela notamment parce que le plan n'est pas orthognoal
+
+```{r}
+el_wa <- matrix(NA,nrow = rep,ncol = 7)
+hdt_wa <- matrix(NA,nrow = rep,ncol = 7)
+for (i in 1:10) {
+  for (j in 1:7) {
+    el_wa[i,j] <- L_coeffs[[i]][[j]][56] #coefficient de l'interaction elevation, wilderness area 2
+    hdt_wa[i,j] <- L_coeffs[[i]][[j]][70] #coefficient de l'interaction horizontal distance to roadway, wilderness area 4
+  }
+  
+}
+
+interactions <- cbind(apply(el_wa,MARGIN = 2, mean),
+      apply(el_wa,MARGIN = 2, sd),
+      apply(hdt_wa,MARGIN = 2, mean),
+      apply(hdt_wa,MARGIN = 2, sd))
+
+colnames(interactions)<- c("moyenne Elevation:W area 2","ecart type Elevation:W area","moyenne Distance to roadway:W area 4","ecart type Distance to roadway:W area 4")
+
+row.names(interactions)<- c("Cover type 1","Cover type 2","Cover type 3","Cover type 4","Cover type 5","Cover type 6","Cover type 7")
+
+print(interactions)
+
+```
+Les écarts types des coefficients entre chaque smulations sont très grands, il devent donc difficile d'interpréter ces coefficients
 
 ## Comparaison des méthodes et conclusion
 
-\--\> ça sera à classer par ordre croissant d'accuracy :)
 
 | Méthode       | Accurracy   | Remarques                                  |
 |---------------|-------------|--------------------------------------------|
 | K-means       | 0.55        | Toutes les classes ne sont pas prédites... |
 | K-NN          | 0.37 à 0.57 | Résulats moyens                            |
-|               |             |                                            |
+| Multinomial model | 0.72    |                                            |
 | Decision tree | 0.72 à 0.87 |                                            |
 | Random forest | 0.78 à 0.98 |                                            |
 
