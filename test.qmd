@@ -324,6 +324,7 @@ accuracy_scores <- numeric(N)
 for (b in 1:N) { 
   res=part_data(forest,freq_cover)
   itest=res[[2]]
+  
   itrain=res[[1]]
   forest_test <-forest[itest,]
   forest_train <-forest[itrain,]
@@ -331,11 +332,11 @@ for (b in 1:N) {
   X_forest_test <-forest_test[,1:54]
   X_forest_train <-forest_train[,1:54]
   
-  Y_forest_test<-forest_test$Cov_type
-  Y_forest_train <-forest_train$Cov_type
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
   
   
-  tree_model <- rpart(Cov_type~., data = forest_train, method="class",control = rpart.control(cp = 0.1)) 
+  tree_model <- rpart(Cover_Type~., data = forest_train, method="class",control = rpart.control(cp = 0.1)) 
   
   # Évaluation de la précision
   y_pred <- predict(tree_model,forest_test, type='class')
@@ -343,6 +344,7 @@ for (b in 1:N) {
   accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
 
 }
+
 
 ```
 
@@ -402,11 +404,11 @@ for (b in 1:N) {
   X_forest_test <-forest_test[,1:54]
   X_forest_train <-forest_train[,1:54]
   
-  Y_forest_test<-forest_test$Cov_type
-  Y_forest_train <-forest_train$Cov_type
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
   
   
-  tree_model <- rpart(Cov_type~., data = forest_train, method="class",control = rpart.control(cp = 0.0005)) 
+  tree_model <- rpart(Cover_Type~., data = forest_train, method="class",control = rpart.control(cp = 0.0005)) 
   
   # Évaluation de la précision
   y_pred <- predict(tree_model,forest_test, type='class')
@@ -477,11 +479,11 @@ for (b in 1:N) {
   X_forest_test <-forest_test[,1:54]
   X_forest_train <-forest_train[,1:54]
   
-  Y_forest_test<-forest_test$Cov_type
-  Y_forest_train <-forest_train$Cov_type
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
   
   
-  rf <-randomForest(Cov_type~.,data=forest_train,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
+  rf <-randomForest(Cover_Type~.,data=forest_train,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
 
   y_pred <- predict(rf,forest_test, type='class')
   
@@ -556,16 +558,16 @@ for (b in 1:N) {
   
   
   # Préparation des données pour l'apprentissage
-  Y <- forest_apprentissage$Cov_type
+  Y <- forest_apprentissage$Cover_Type
   X <- forest_apprentissage[,1:54]
   
   
   #Préparation des données pour le test
-  Y2 <- forest_test$Cov_type
+  Y2 <- forest_test$Cover_Type
   X2 <- forest_test[,1:54]
   
   
-  rf <-randomForest(Cov_type~.,data=forest_apprentissage,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
+  rf <-randomForest(Cover_Type~.,data=forest_apprentissage,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
 
   
   y_pred <- predict(rf,forest_test, type='class')
