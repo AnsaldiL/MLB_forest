@@ -236,7 +236,7 @@ C = factor(Cov_type,levels=c(1,2,3,4,5,6,7))
 nb_Cov_type <- length(unique(Cov_type))
 
 # on va trouver le meilleur nombre de voisin possible pour minimiser l'erreur
-nb_neighbors = c(1,5,10,20,25,30,35,40)
+nb_neighbors = c(1,10,20,50,100,150,200)
 
 n = dim(pcaXforest$ind$coord)[1]
 B = 10
@@ -246,8 +246,8 @@ err_knn = matrix(0,B,length(nb_neighbors))
 for (b in 1:B) { #10 répétitions du modèle 
   set.seed(b)
   
-  itrain <- unlist(part_data(forest)[1])
-  itest <- unlist(part_data(forest)[2])
+  itrain <- unlist(part_data(forest,freq_cover)[1])
+  itest <- unlist(part_data(forest,freq_cover)[2])
   
   
   Xs_train = scale(pcaXforest$ind$coord[itrain,])
@@ -311,7 +311,6 @@ df %>%
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-Avec le partitionnement 2/3 et 1/3, l'accurracy monte à 0.5693757
 
 # Algorithme decision tree
 
@@ -614,7 +613,6 @@ plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB"
 
 # Methodes model-driven
 
-> > > > > > > 594ca74e5a7d9a7277218afc31496c30dc91f856
 
 -   Modèle multinomial
 
@@ -895,17 +893,17 @@ Selection variable random forest multinom: lesquelles sont importantes
 
 \--\> ça sera à classer par ordre croissant d'accuracy :)
 
-| Méthode       | Accurracy   |     |
-|---------------|-------------|-----|
-| K-means       | 0.55        |     |
-| K-NN          | 0.37 à 0.57 |     |
-|               |             |     |
-| Decision tree | 0.72 à 0.87 |     |
-| Random forest | 0.78 à 0.98 |     |
+| Méthode       | Accurracy   |
+|---------------|-------------|
+| K-means       | 0.55        |
+| K-NN          | 0.37 à 0.57 |
+|               |             |
+| Decision tree | 0.72 à 0.87 |
+| Random forest | 0.78 à 0.98 |
 
 IDEE CONCLU:
 
-\- Pour les datas driven methods: + de données = + accuracy - Différence KNN
+\- Pour les datas driven methods : + de données = + accuracy 
 
 -   Mais pas possible d'utiliser toutes les données pour regression:
 
