@@ -1,0 +1,909 @@
+---
+title: "Machine Learning et prediction d'un couvert forestier"
+author: Lucile ANSALDI, Youna DOUCHET, Lucia OLIVEIRA-CRUZ
+date: 10/11/2023
+editor: visual
+format: 
+  revealjs :
+     slide-number: true
+---
+
+## Objectif de l'étude
+
+Prédiction des couverts forestiers à partir de variables cartographiques.
+
+![](\couverture.jpg)
+
+## Pourquoi utiliser le **machine learning** ?
+
+-   Pour répertorier le couvert
+
+-   Eviter le déplacement de technicien.ne.s sur place
+
+-   Avoir des informations sur des terres qui ne sont pas sous contrôle direct
+
+## Présentation des données
+
+Données issues utilisées dans une étude de Blackard et Dean, publiée en 1999, provenant du parc National Roosevelt, dans le Colorado.
+
+Le jeu de donné regroupe des données pédologiques et cartographique ainsi que la catégorie de couvert forestier.
+
+```{r echo = FALSE, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(FactoMineR)
+library(ggplot2)
+library(class)
+library(ggplot2) 
+library(corrplot)
+library(glmnet) # multinomiale avec pénalité lasso
+library(rpart)
+library(partykit)
+#library(caret)
+library(randomForest)
+library(randomForestExplainer)
+
+forest = read.table(file = "covtype.data", sep=",", header=TRUE) 
+
+a <- rep("Soil_Type_",40)
+for (i in 1:40) {
+  a[i]<-paste0(a[i],as.character(i))
+} 
+
+name <- c("Elevation",
+          "Aspect",
+          "Slope",
+          "Horizontal_Distance_To_Hydrology",
+          "Vertical_Distance_To_Hydrology",
+          "Horizontal_Distance_To_Roadways",
+          "Hillshade_9am",
+          "Hillshade_Noon",
+          "Hillshade_3pm",
+          "Horizontal_Distance_To_Fire_Points",
+          "Wilderness_Area_1",
+          "Wilderness_Area_2",
+          "Wilderness_Area_3",
+          "Wilderness_Area_4",
+          a,
+          "Cover_Type")
+colnames(forest)<- name
+Cov_type = forest$Cover_Type
+Xforest <- subset(forest, select = -Cover_Type)
+pcaXforest <- PCA(Xforest, ncp = 2) 
+```
+
+```{r,include=FALSE}
+#str(forest)
+100*table(forest$Cover_Type)/sum(table(forest$Cover_Type))
+```
+
+## Valeurs extremes de $X$ 
+
+```{r dataCov1, include=TRUE}
+par(mfrow=c(2,3))
+for (i in 1:6) {
+  boxplot(forest[,i],pch=16,col='salmon',xlab=colnames(forest)[i])
+}
+
+```
+
+
+## Répartition des individus pour les variables qualitatives 
+
+```{r}
+quali <- apply(forest[,11:54], MARGIN = 2, table)
+print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),optional = TRUE )[1:4,])
+```
+
+## Relations entre X & Y 
+
+
+```{r dataCov2, include=TRUE, fig.height=3, fig.width=8}
+# variables X quantitatives
+par(mfrow=c(1,2))
+for (i in c(1,6)) {
+  boxplot(Xforest[,i]~Cov_type,ylab=colnames(Xforest)[i],xlab = "Cover type")
+}
+
+```
+
+
+## Méthodes testées
+
+![](Demarche.jpg)
+
+## Data driven algorithms
+
+-   K-means
+
+-   K-nearest neighbourgs
+
+-   Decision tree
+
+-   Random forest
+
+# Algorithme des K-means
+
+## Code K-means
+
+```{r, echo = TRUE}
+n_clusters = length(unique(Cov_type)) # Nombre de cluster attendu : autant que de couverts forestiers possibles
+set.seed(1)
+i.centers = sample(1:dim(pcaXforest$ind$coord)[1],n_clusters) # initialisation aléatoire des clusters. 
+centers = pcaXforest$ind$coord[i.centers,]
+km = kmeans(pcaXforest$ind$coord,centers,nstart=10,iter.max=50) # avec 10 sets aléatoires et 50 itérations au maximum
+cl = km$cluster # tous les individus sont associés à une classe
+
+cl_lab = cl
+for (k in 1:n_clusters){
+  ii = which(cl==k) 
+  counts=table(Cov_type[ii]) # Nb d'occurences de chaque classe
+  imax=which.max(counts) # Calcul de la classe majoritaire
+  maj_lab=attributes(counts)$dimnames[[1]][imax] # attribution de l'étiquette de la classe
+  print(paste("Classe ",k,", label majoritaire = ",maj_lab))
+  cl_lab[ii] = maj_lab
+}
+```
+
+### 
+
+## Résultat K-means
+
+<div>
+
+```{r accuracy kmeans, echo=FALSE}
+accuracy <- sum(cl_lab == Cov_type)/(length(Cov_type))
+print(paste("l'accuracy de la classification avec l'algorithme des k-means est de",accuracy)) 
+```
+
+```{r, echo=FALSE}
+#matrice de confusion et accuracy
+confusion = (conf_mat = table(Cov_type,cl_lab, dnn=list("Observed","Predicted")))
+```
+
+```{r mat conf kmean}
+# représentation de la matrice de confusion
+df = as.data.frame(confusion)
+df %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion K-means")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+</div>
+
+## Des fréquences déséquilibrées...
+
+```{r freq}
+hist(Cov_type, col="orange2", main="Fréquence des types de couverts", xlab="Type de couvert", ylab="Nombre")
+```
+
+## Apprentissage supervisé et partitionnement du jeu de données
+
+Séparation du jeu de données de deux manières différentes : - 2/3 train 1/3 test - partitionnement plus fin pour correspondre aux particularité du jeu de données et réduire le temps de calcul
+
+### Fonction de partitionnement :
+
+```{r part_data, echo=TRUE}
+
+part_data <- function(data,freq){
+  # prend en entree le jeu de donnee à echantillonner et un vecteur de fréquences pour chaque classe dans l'ordre (1 à 7)
+  # renvoie les indices des individus de l'echantillon d'entrainement et de l'echantillon de validation
+  nb_indiv <- length(data[,1])
+  itrain <- c()
+  itest <- c(1:nb_indiv)
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 15:54) { #les colonnes 14 à 53 sont les colonnes "soil type"
+    itrain <- c(itrain,sample(x = which(data[,i] == 1 ),size = 3)) 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 11:14) { #les colonnes" 14 à 53 sont les colonnes "soil type""Wilderness_area"
+    itrain <- c(itrain,sample(x = setdiff(which(data[,i] == 1 ),itrain),size = 3)) #dans les données pas deja echantilonnee 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 1000 observations par type de recouvrement végétal
+  nb <- freq*4000
+  for (i in 1:7) {
+    itrain <- c(itrain,sample(x = setdiff(which(data$Cover_Type == i),itrain),size = nb[i]))
+  }
+  
+  itest <- setdiff(itest,itrain)
+  itest <- sample(itest,2066) 
+  
+  return(list(itrain,itest))
+
+}
+
+
+```
+
+### Utiliser les fréquences de chaque classes
+
+```{r dataY, include=TRUE}
+table(forest$Cover_Type)
+freq_cover <- table(forest$Cover_Type)/length(forest$Cover_Type) # en proportions
+```
+
+# Méthode K-NN {style=".smaller"}
+
+```{r knn nb n}
+C = factor(Cov_type,levels=c(1,2,3,4,5,6,7)) 
+nb_Cov_type <- length(unique(Cov_type))
+
+# on va trouver le meilleur nombre de voisin possible pour minimiser l'erreur
+nb_neighbors = c(1,5,10,20,25,30,35,40)
+
+n = dim(pcaXforest$ind$coord)[1]
+B = 10
+err_knn = matrix(0,B,length(nb_neighbors))
+
+
+for (b in 1:B) { #10 répétitions du modèle 
+  set.seed(b)
+  
+  itrain <- unlist(part_data(forest)[1])
+  itest <- unlist(part_data(forest)[2])
+  
+  
+  Xs_train = scale(pcaXforest$ind$coord[itrain,])
+  Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
+  for (i in 1:length(nb_neighbors)) {
+    knn_res = knn(Xs_train,Xs_test,Cov_type[itrain],k=nb_neighbors[i],prob=TRUE)
+    err_knn[b,i] = sum(Cov_type[itest]!=knn_res)/length(itest)
+  }
+  
+}
+
+apply(err_knn,2,mean) #on fait la moyenne des col de err_knn 
+colnames(err_knn)=nb_neighbors
+boxplot(err_knn, main = "Erreur et nombre de voisins", col='orange2') 
+w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
+```
+
+## Résultats de la méthode K-NN {style=".smaller"}
+
+Avec le partitionnement des données adapté
+
+```{r include = TRUE}
+w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
+
+n = dim(pcaXforest$ind$coord)[1]
+B = 10 # number of samples for the cross validation
+y_test = y_prob = NULL
+for (b in 1:B){
+  set.seed(b)
+  
+  itrain <- unlist(part_data(forest)[1])
+  itest <- unlist(part_data(forest)[2])
+  
+  Xs_train = scale(pcaXforest$ind$coord[itrain,])
+  Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
+  knn_res = knn(Xs_train,Xs_test,C[itrain],k=nb_neighbors[w],prob=TRUE)
+  y_prob = c(y_prob,attributes(knn_res)$prob)
+  y_test = c(y_test,C[itest])
+}
+
+Cres <- C[itest]
+
+conf_mat_knn = (conf_mat = table(Cres, knn_res, dnn=list("Predicted", "Observed")))
+
+accuracy <- sum(knn_res == Cres)/(length(Cres))
+print(paste("l'accuracy est de :", accuracy))
+#0.3579832
+
+# représentation de la matrice de confusion
+df = as.data.frame(conf_mat_knn)
+df %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion K-means")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Avec le partitionnement 2/3 et 1/3, l'accurracy monte à 0.5693757
+
+# Algorithme decision tree
+
+## Compléxité faible et partitionnement représentatif
+
+```{r, echo = TRUE}
+N=10
+
+forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+accuracy_scores <- numeric(N)
+
+for (b in 1:N) { 
+  res=part_data(forest,freq_cover)
+  itest=res[[2]]
+  itrain=res[[1]]
+  forest_test <-forest[itest,]
+  forest_train <-forest[itrain,]
+
+  X_forest_test <-forest_test[,1:54]
+  X_forest_train <-forest_train[,1:54]
+  
+  Y_forest_test<-forest_test$Cov_type
+  Y_forest_train <-forest_train$Cov_type
+  
+  
+  tree_model <- rpart(Cov_type~., data = forest_train, method="class",control = rpart.control(cp = 0.1)) 
+  
+  # Évaluation de la précision
+  y_pred <- predict(tree_model,forest_test, type='class')
+
+  accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
+
+}
+
+```
+
+## Résulats
+
+```{r,echo=FALSE}
+#Visualisation de l'arbre de décision
+  op = par(mfrow=c(1,2), cex=0.5)
+  plot(tree_model, uniform = TRUE, branch = 0.5, margin = 0.2)
+  text(tree_model, all = FALSE, use.n = FALSE)
+  plotcp(tree_model)
+```
+
+## Résulats
+
+```{r,echo=FALSE}
+#Matrice de confusion pour le dernier arbre
+confusion0 = table(Y_forest_test,y_pred,dnn=list("Observed","Predicted"))
+
+df0 = as.data.frame(confusion0)
+df0 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion decision tree")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+
+```
+
+## Compléxité forte et partitionnement représentatif
+
+cp = 0.0005
+
+```{r}
+N=10
+
+forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+accuracy_scores <- numeric(N)
+
+for (b in 1:N) { 
+  res=part_data(forest,freq_cover)
+  itest=res[[2]]
+  itrain=res[[1]]
+  forest_test <-forest[itest,]
+  forest_train <-forest[itrain,]
+
+  X_forest_test <-forest_test[,1:54]
+  X_forest_train <-forest_train[,1:54]
+  
+  Y_forest_test<-forest_test$Cov_type
+  Y_forest_train <-forest_train$Cov_type
+  
+  
+  tree_model <- rpart(Cov_type~., data = forest_train, method="class",control = rpart.control(cp = 0.0005)) 
+  
+  # Évaluation de la précision
+  y_pred <- predict(tree_model,forest_test, type='class')
+
+  accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
+
+}
+
+```
+
+```{r}
+#Visualisation de l'arbre de décision
+  #op = par(mfrow=c(2,2), cex=0.5)
+  #plot(tree_model, uniform = TRUE, branch = 0.5, margin = 0.2)
+  #text(tree_model, all = FALSE, use.n = FALSE)
+  plotcp(tree_model)
+```
+
+## Résulats
+
+```{r}
+#Matrice de confusion pour le dernier arbre
+confusion1 = table(Y_forest_test,y_pred,dnn=list("Observed","Predicted"))
+
+df1 = as.data.frame(confusion1)
+df1 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion decision tree")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+```
+
+## COMPARAISON METHODE DE PARTITIONNEMENT
+
+-   Accuracy de 87% avec l'utilisation de toutes les données
+-   Contre 71% avec le sous jeu de données représentatif
+-   Data driven method nécessite beaucoup de données pour l'apprentissage
+-   Gain de temps de simulation
+
+# Algorithme des random forest
+
+## Code
+
+ntree = 20, mtry = 20, maxdepth=5, minsplit=15
+
+```{r, echo=TRUE}
+N=10
+forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+accuracy_scores <- numeric(N)
+
+for (b in 1:N) {  
+  res=part_data(forest,freq_cover)
+  itest=res[[2]]
+  itrain=res[[1]]
+  forest_test <-forest[itest,]
+  forest_train <-forest[itrain,]
+
+  X_forest_test <-forest_test[,1:54]
+  X_forest_train <-forest_train[,1:54]
+  
+  Y_forest_test<-forest_test$Cov_type
+  Y_forest_train <-forest_train$Cov_type
+  
+  
+  rf <-randomForest(Cov_type~.,data=forest_train,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
+
+  y_pred <- predict(rf,forest_test, type='class')
+  
+  accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
+  
+}
+
+```
+
+## Résultats
+
+```{r}
+
+#Matrice de confusion pour le dernier arbre
+confusion2 = table(Y_forest_test,y_pred,dnn=list("Observed","Predicted"))
+
+df2 = as.data.frame(confusion2)
+df2 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion random forest")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+```
+
+## Résultats
+
+```{r, echo=FALSE}
+#Pour regarder OOB
+op = par(mfrow=c(1,2), cex=0.5)
+plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB")
+plot(rf$importance)
+```
+
+## Sélection des variables importantes
+
+```{r, echo=FALSE}
+rf$importance
+```
+
+## COMPARAISON METHODE DE PARTITIONNEMENT
+
+-   Méthode des random forest est la plus performante
+
+-   78% d'accuracy pour les prédictions
+
+-   Les variables Sol_type peuvent être negligée pour l'analyse
+
+-   Maintenant que l'on la méthode la plus efficace on peut tester l'algorithme sur le jeu de données complet
+
+## Partitionnement 2/3 entrainement, 1/3 test
+
+```{r,echo=TRUE}
+N=5 #nombre d'itérations
+forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+accuracy_scores <- numeric(N)
+
+for (b in 1:N) { 
+  set.seed(b)
+  forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+  forest_apprentissage <- forest_shuffled[1:400000, ] #Apprentissage
+  forest_test <- forest_shuffled[400001:581011, ]  #Test
+  
+  
+  # Préparation des données pour l'apprentissage
+  Y <- forest_apprentissage$Cov_type
+  X <- forest_apprentissage[,1:54]
+  
+  
+  #Préparation des données pour le test
+  Y2 <- forest_test$Cov_type
+  X2 <- forest_test[,1:54]
+  
+  
+  rf <-randomForest(Cov_type~.,data=forest_apprentissage,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
+
+  
+  y_pred <- predict(rf,forest_test, type='class')
+  accuracy_scores[b] <- sum(y_pred == Y2)/ length(Y2)
+}
+```
+
+## Résultats
+
+```{r}
+confusion3 = table(Y2,y_pred,dnn=list("Observed","Predicted"))
+df3 = as.data.frame(confusion3)
+df3 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="red")+
+  coord_fixed()+
+  theme_minimal()+ggtitle("Matrice de confusion random forest")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+```
+
+## Résultats
+
+```{r}
+plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB")
+```
+
+## Resultat
+
+-   Très bonne accuracy de 96% sur une moyenne de N=5 itérations
+
+-   L'utilisation de l'ensemble des données rend l'algorithme très performant
+
+-   Pas d'overfitting détecté, grâce à la validation croisée et au paramètre rpart.control
+
+-   Simulation longue mais qui augmente la précision des prédictions
+
+# Methodes model-driven
+
+-   Modèle multinomial
+
+-   Réseau de neuronne
+
+## Formalisme du modèle multinomial:
+
+$$ Cover \: type \: \sim \: Elevation \: + \: Aspect \: + \: Slope \: + \: ... \: + \: Soil \: type \: 40 \: + \: Interactions$$
+
+$Y = Cover \: type$, la variable réponse\
+$Xs$ les variables prédictives\
+
+## Analyse des interactions entre les variables X
+
+```{r,echo=FALSE,include=FALSE}
+# variables X qualitatives
+temp_forest <- Xforest
+temp_forest[,11:54][temp_forest[,-c(1:10)] == 0] <- NA
+
+temp_forest <- pivot_longer(temp_forest,cols = seq(15,54),names_to = "Soil_type",values_to = "pres_abs", values_drop_na = TRUE)
+temp_forest <- pivot_longer(temp_forest,cols = seq(11,14),names_to = "Wilderness_area",values_to = "pres_ab", values_drop_na = TRUE)
+temp_forest <- temp_forest[,-c(12,14)]
+
+```
+
+
+```{r}
+
+# Interactions possibles entre les variables qualitatives et quantitatives
+
+par(mfrow=c(1,2))
+boxplot(temp_forest$Horizontal_Distance_To_Fire_Points~temp_forest$Wilderness_area, varwidth = TRUE, ylab = "Horizontal_Distance_To_Fire_Points", xlab = "Wilderness area", main = "", xaxt = "n")
+boxplot(temp_forest$Horizontal_Distance_To_Roadways~temp_forest$Wilderness_area, varwidth = TRUE, ylab = colnames(temp_forest)[i], xlab = "Soil type ", main = "", xaxt = "n")
+
+rm(temp_forest)
+
+
+```
+
+
+## Analyse des interactions entre les variables X
+
+Interactions potentielles :\
+- Horizontal distance to fire, Wilderness area\
+- Horizontal distance to Roadway, Wilderness area\
+- Slope, Wilderness area\
+- Slope, soil type\
+- Elevation, Wilderness area
+
+## Analyse des corrélations entre les X quantitatifs
+
+```{r}
+M<-cor(Xforest[,1:10])
+corrplot.mixed(M,upper="square",lower.col="black", tl.col="black",cl.cex = 0.7,tl.cex = 0.6,number.cex =0.7)
+Xforest_red <- Xforest[,-9]
+```
+
+
+## Centrer et réduire les variables quantitatives
+
+```{r}
+Xforest_red_cr <- Xforest_red
+Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,center = TRUE, scale = TRUE))
+```
+
+## Points de vigilance
+
+-   Réduction du jeu de données \ 
+
+-   Plan non orthogonal \ 
+
+-   Sélection de variables avec un pénalité lasso \ 
+
+-   Comparaison par mesure d'accuracy
+
+## Ecriture du modèle
+
+```{r fullmodel,include=TRUE}
+
+
+rep <- 10 #normalement sur 550 essais mais tournerait trop longtemps
+L_coeffs <- list()
+prediction <- matrix(NA,nrow = 2066,ncol = rep*2)
+
+
+T1<-Sys.time()
+for (b in 1:rep) { 
+  # subset de données 
+  set.seed(b)
+  select_indiv <- part_data(forest,freq_cover)
+  Ytrain <- Cov_type[select_indiv[[1]]] 
+  Ytest <- Cov_type[select_indiv[[2]]] 
+  Xtrain <- Xforest_red_cr[select_indiv[[1]],] 
+  Xtest <- Xforest_red_cr[select_indiv[[2]],]
+  
+  # Introduction des interactions dans le modèle
+  f <- as.formula(Ytrain ~ .+Wilderness_Area_1:Elevation+
+                    Wilderness_Area_2:Elevation+
+                    Wilderness_Area_3:Elevation+
+                    Wilderness_Area_4:Elevation+
+                    Wilderness_Area_1:Slope+
+                    Wilderness_Area_2:Slope+
+                    Wilderness_Area_3:Slope+
+                    Wilderness_Area_4:Slope+
+                    Wilderness_Area_1:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_2:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_3:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_4:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_1:Horizontal_Distance_To_Roadways+
+                    Wilderness_Area_2:Horizontal_Distance_To_Roadways+
+                    Wilderness_Area_3:Horizontal_Distance_To_Roadways+
+                    Wilderness_Area_4:Horizontal_Distance_To_Roadways,
+                  cbind(Xtrain,Ytrain))
+  
+  f2 <- as.formula(Ytest ~ .+Wilderness_Area_1:Elevation+
+                    Wilderness_Area_2:Elevation+
+                    Wilderness_Area_3:Elevation+
+                    Wilderness_Area_4:Elevation+
+                    Wilderness_Area_1:Slope+
+                    Wilderness_Area_2:Slope+
+                    Wilderness_Area_3:Slope+
+                    Wilderness_Area_4:Slope+
+                    Wilderness_Area_1:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_2:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_3:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_4:Horizontal_Distance_To_Fire_Points+
+                    Wilderness_Area_1:Horizontal_Distance_To_Roadways+
+                    Wilderness_Area_2:Horizontal_Distance_To_Roadways+
+                    Wilderness_Area_3:Horizontal_Distance_To_Roadways+
+                    Wilderness_Area_4:Horizontal_Distance_To_Roadways,
+                  cbind(Xtest,Ytest))
+  
+  Xtrain_inter <- model.matrix(f, cbind(Xtrain,Ytrain))[, -1]
+  Xtest_inter <- model.matrix(f2, cbind(Xtest,Ytest))[, -1]
+  # formulation du modèle avec une pénalité lasso
+  mod <- cv.glmnet(Xtrain_inter,Ytrain, alpha=1,family = "multinomial")
+  L_coeffs[[b]] <- coef(mod, s = "lambda.min") #on choisit la pénalité lasso optimale pour le modèle basé sur 
+  
+  # prédictions du modèle
+  prediction[,b] <- predict(mod, Xtest_inter,type = "class",s = "lambda.min")
+  prediction[,(rep*2-b+1)] <- Ytest
+
+
+
+}
+
+T2<-Sys.time()
+
+(Tdiff= difftime(T2, T1))
+
+
+```
+
+## Difficultés
+
+- Temps de calculs \ 
+- Comment sélectionner le tunning parameter \ 
+- Comment interpréter les coefficients des intéractions \ 
+- Quel échantillonnage choisir \ 
+
+## Résultats: accuracy
+
+```{r, include=FALSE,echo=FALSE}
+
+df_mod <- matrix(c(rep(seq(1,7),7),
+                   rep(1,7),
+                   rep(2,7),
+                   rep(3,7),
+                   rep(4,7),
+                   rep(5,7),
+                   rep(6,7),
+                   rep(7,7),rep(0,49)),byrow = FALSE,nrow = 49,ncol = 3)
+df_mod <- as.data.frame(df_mod)
+colnames(df_mod) <- c("Observed","Predicted","Freq")
+
+confusion_mod <- NA
+accuracy_mod <- c()
+
+for (i in 1:rep) {
+  mean_accuracy <- 0
+  
+  confusion_mod = as.data.frame((conf_mat = table(prediction[,((rep*2)-i+1)],prediction[,i], dnn=list("Observed","Predicted"))))
+  confusion_mod$Observed <- as.numeric(confusion_mod$Observed)
+  confusion_mod$Predicted <- as.numeric(confusion_mod$Predicted)
+  for (j in 1:max(confusion_mod$Observed)) {
+    for (k in 1:max(confusion_mod$Predicted)) {
+      df_mod[df_mod$Observed == j & df_mod$Predicted == k,3] <- df_mod[df_mod$Observed == j & df_mod$Predicted == k,3]+ confusion_mod[confusion_mod$Observed == j & confusion_mod$Predicted == k,3]
+      df_mod <- as.data.frame(df_mod)
+    }
+    #calcul de l'accuracy
+    mean_accuracy <- mean_accuracy + confusion_mod[confusion_mod$Observed==j & confusion_mod$Predicted==j,3]
+    }
+    accuracy_mod<-c(accuracy_mod,mean_accuracy/2066)
+    
+  
+}
+df_mod_pourc<-df_mod
+df_mod_pourc$Freq <-df_mod_pourc$Freq/rep
+
+```
+
+```{r}
+  
+ggplot(df_mod_pourc, aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="red")+
+  coord_fixed()+
+  theme_minimal()+ggtitle("Matrice de confusion moyenne modèle multinomiale")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+print(paste("Sur dix répétitions, l'accuracy est de :", mean(accuracy_mod)," et d'écart type, ", sd(accuracy_mod)))
+
+
+
+```
+
+## Résultats: sélection des variables
+
+On regarde les variables qui ressortent moins de 80% des fois
+
+```{r, include=FALSE,echo=FALSE}
+occurence_var <- matrix(0,nrow = 70,ncol=7) # contient en ligne la somme des coefficients Beta non nuls au cours des répétitions du modele pour chaque classe en colonne
+
+for (i in 1:rep) {
+  for (j in 1:7) {
+    occurence_var[(which(L_coeffs[[i]][[j]] != 0)),j] <- (occurence_var[(which(L_coeffs[[i]][[j]] != 0)),j]+ 1)
+  }
+  
+}
+#quelles variables ne sont pas présentes plus de 80% des fois ? 
+occurence_var_pourcent <- apply(occurence_var, c(1,2), function(X) X*100/rep)
+occurence_inf80 <- list()
+for (i in 1:7) {
+  occurence_inf80[[i]] <- c("intercept",row.names(L_coeffs[[1]]$`1`))[which(occurence_var_pourcent[,i]<80)]
+}
+
+
+```
+
+
+![](\selectvar.png)
+
+## Résultats: interprétation des coefficients d'intéractions
+
+Pour les deux intéractions importantes:
+
+```{r, include=FALSE,echo=FALSE}
+el_wa <- matrix(NA,nrow = rep,ncol = 7)
+hdt_wa <- matrix(NA,nrow = rep,ncol = 7)
+for (i in 1:10) {
+  for (j in 1:7) {
+    el_wa[i,j] <- L_coeffs[[i]][[j]][56] #coefficient de l'interaction elevation, wilderness area 2
+    hdt_wa[i,j] <- L_coeffs[[i]][[j]][70] #coefficient de l'interaction horizontal distance to roadway, wilderness area 4
+  }
+  
+}
+
+interactions <- cbind(apply(el_wa,MARGIN = 2, mean),
+      apply(el_wa,MARGIN = 2, sd),
+      apply(hdt_wa,MARGIN = 2, mean),
+      apply(hdt_wa,MARGIN = 2, sd))
+
+colnames(interactions)<- c("moyenne Elevation:W area 2","ecart type Elevation:W area","moyenne Distance to roadway:W area 4","ecart type Distance to roadway:W area 4")
+
+row.names(interactions)<- c("Cover type 1","Cover type 2","Cover type 3","Cover type 4","Cover type 5","Cover type 6","Cover type 7")
+
+```
+
+```{r}
+print(interactions)
+```
+
+
+## Comparaison des méthodes et conclusion
+
+
+| Méthode       | Accurracy   | Remarques                                  |
+|---------------|-------------|--------------------------------------------|
+| K-means       | 0.55        | Toutes les classes ne sont pas prédites... |
+| K-NN          | 0.37 à 0.57 | Résulats moyens                            |
+| Multinomial model | 0.72    |                                            |
+| Decision tree | 0.72 à 0.87 |                                            |
+| Random forest | 0.78 à 0.98 |                                            |
+
+IDEE CONCLU: - Pour les datas driven methods: + de données = + accuracy - Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.

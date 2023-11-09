@@ -1,0 +1,2 @@
+"0","Xforest_red_cr <- Xforest_red"
+"0","Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,center = TRUE, scale = TRUE))"
