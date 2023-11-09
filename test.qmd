@@ -76,6 +76,50 @@ Xforest <- subset(forest, select = -Cover_Type)
 str(forest)
 ```
 
+## Valeurs extremes de $X$ 
+
+```{r dataCov1, include=TRUE}
+par(mfrow=c(2,3))
+for (i in 1:10) {
+  # Cleveland plot
+  boxplot(forest[,i],pch=16,col='salmon',xlab=colnames(forest)[i])
+}
+
+```
+
+Les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
+
+
+## Répartition des individus pour les variables qualitatives -> en haut 
+
+```{r}
+quali <- apply(forest[,11:54], MARGIN = 2, table)
+print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),optional = TRUE ))
+```
+
+En calculant le pourcentage des observations appartenant à chaque classe de "Wilderness area" et de "Soil type, on remarque que Wilderness area 2 et 4 ne représentent respectivement que 5.1 et 6.4 % des observations.\
+\
+
+Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numero 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
+
+## Relations entre X & Y 
+
+Première estimation des relations possibles entre les variables quantitatives explicatives et la variable réponse.
+
+```{r dataCov2, include=TRUE, fig.height=3, fig.width=8}
+# variables X quantitatives
+par(mfrow=c(1,2))
+for (i in 1:10) {
+  boxplot(Xforest[,i]~Cov_type,ylab=colnames(Xforest)[i],xlab = "Cover type")
+}
+
+```
+
+Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
+
+plotter dans quarto : i = 1 et 6 les variables ou var semble avoir le plus d'impact
+
+
 ## Méthodes testées
 
 ![](Demarche.jpg)
@@ -591,52 +635,10 @@ plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB"
 
 ## Formalisme du modèle multinomial:
 
-$$ Cover \: type \: \sim \: Elevation \: + \: Aspect \: + \: Slope \: + \: ... \: + \: Soil \: type \: 40$$
+$$ Cover \: type \: \sim \: Elevation \: + \: Aspect \: + \: Slope \: + \: ... \: + \: Soil \: type \: 40 \: + \: Interactions$$
 
 $Y = Cover \: type$, la variable réponse\
 $Xs$ les variables prédictives\
-
-## Valeurs extremes de $X$ -> en haut
-
-```{r dataCov1, include=TRUE}
-par(mfrow=c(2,3))
-for (i in 1:10) {
-  # Cleveland plot
-  boxplot(forest[,i],pch=16,col='salmon',xlab=colnames(forest)[i])
-}
-
-```
-
-Les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
-
-## Répartition des individus pour les variables qualitatives -> en haut 
-
-```{r}
-quali <- apply(forest[,11:54], MARGIN = 2, table)
-print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),optional = TRUE ))
-```
-
-En calculant le pourcentage des observations appartenant à chaque classe de "Wilderness area" et de "Soil type, on remarque que Wilderness area 2 et 4 ne représentent respectivement que 5.1 et 6.4 % des observations.\
-\
-
-Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numero 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
-
-## Relations entre X & Y -\> en haut
-
-Première estimation des relations possibles entre les variables quantitatives explicatives et la variable réponse.
-
-```{r dataCov2, include=TRUE, fig.height=3, fig.width=8}
-# variables X quantitatives
-par(mfrow=c(1,2))
-for (i in 1:10) {
-  boxplot(Xforest[,i]~Cov_type,ylab=colnames(Xforest)[i],xlab = "Cover type")
-}
-
-```
-
-Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
-
-plotter dans quarto : i = 1 et 6 les variables ou var semble avoir le plus d'impact
 
 ## Analyse des interactions entre les variables X
 
@@ -883,7 +885,7 @@ On ne remarque pas de motif particulier dans les variables importantes et pas de
 
 
 
-## attention à l'interprétation des coefficients d'intéractions
+## Attention à l'interprétation des coefficients d'intéractions
 
 Pour les deux intéractions importantes, on regarde si les coefficients varient selon les simulations. On fait attention à cela notamment parce que le plan n'est pas orthognoal
 
@@ -910,7 +912,7 @@ row.names(interactions)<- c("Cover type 1","Cover type 2","Cover type 3","Cover 
 print(interactions)
 
 ```
-Les écarts types des coefficients entre chaque smulations sont très grands, il devent donc difficile d'interpréter ces coefficients
+Les écarts types des coefficients entre chaque simulations sont très grands, il devent donc difficile d'interpréter ces coefficients
 
 ## Comparaison des méthodes et conclusion
 
