@@ -311,7 +311,6 @@ df %>%
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-
 # Algorithme decision tree
 
 ## Compléxité faible et partitionnement représentatif
@@ -613,7 +612,6 @@ plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB"
 
 # Methodes model-driven
 
-
 -   Modèle multinomial
 
 -   Réseau de neuronne
@@ -889,30 +887,24 @@ print(interactions)
 
 ## Comparaison des méthodes et conclusion
 
-Selection variable random forest multinom: lesquelles sont importantes
-
-\--\> ça sera à classer par ordre croissant d'accuracy :)
-
 | Méthode       | Accurracy   |
 |---------------|-------------|
 | K-means       | 0.55        |
-| K-NN          | 0.37 à 0.57 |
-|               |             |
+| K-NN          | 0.57        |
+| Regression    | 0.72        |
 | Decision tree | 0.72 à 0.87 |
-| Random forest | 0.78 à 0.98 |
+| Random forest | 0.78 à 0.96 |
 
-IDEE CONCLU:
+\- La PCA pour les KNN entraine une perte d'information par rapport RF et à la regression. Algorithme pas assez précis pour distinguer les différences entre classes
 
-\- Pour les datas driven methods : + de données = + accuracy 
+\- Pour les datas driven methods KNN/Random forest : travailler avec plus de données apporte de la précision mais pas possible d'utiliser toutes les données pour regression.
 
--   Mais pas possible d'utiliser toutes les données pour regression:
+\- Rf et repression donne des résultats de précision et de variables sélectionées équivalent avec le sous jeu de données, réaliser la regression avec plus de données est une piste d'amélioration
 
-\- Random forest/KNN : la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
+\- Les forêts aléatoires donne la meilleure accuracy
 
--   Methode regression multinoamiale comparable au knn et random forest avec données: normalemt équivalent
+## Comparaison avec l'article
 
--   Conclu final:
+\- Réseau de neurone avec 71% d'accuracy
 
--   Ce qui aurait être fait en continuité de la multinom réseau de neurones. Nous on a pas fait reseau de neurone fait dans comparaison à l'article, eux ils ont fait le réseau de neurone --\> comparer leur accuracy. Apparament modele plus simple prédise mieux
-
-Donc en conclusion pour ce jeu de données ce qui marche bien, c'est bcp de données et methode simple
+**- La grande quantité de données rend les data driven methods les plus performantes avec des temps de simulation raisonnable.**
