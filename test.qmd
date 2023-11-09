@@ -69,55 +69,43 @@ name <- c("Elevation",
 colnames(forest)<- name
 Cov_type = forest$Cover_Type
 Xforest <- subset(forest, select = -Cover_Type)
-#pcaXforest <- PCA(Xforest, ncp = 2) 
+pcaXforest <- PCA(Xforest, ncp = 2) 
 ```
 
-```{r}
-str(forest)
+```{r,include=FALSE}
+#str(forest)
+100*table(forest$Cover_Type)/sum(table(forest$Cover_Type))
 ```
 
 ## Valeurs extremes de $X$ 
 
 ```{r dataCov1, include=TRUE}
 par(mfrow=c(2,3))
-for (i in 1:10) {
-  # Cleveland plot
+for (i in 1:6) {
   boxplot(forest[,i],pch=16,col='salmon',xlab=colnames(forest)[i])
 }
 
 ```
 
-Les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
 
-
-## Répartition des individus pour les variables qualitatives -> en haut 
+## Répartition des individus pour les variables qualitatives 
 
 ```{r}
 quali <- apply(forest[,11:54], MARGIN = 2, table)
-print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),optional = TRUE ))
+print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),optional = TRUE )[1:4,])
 ```
-
-En calculant le pourcentage des observations appartenant à chaque classe de "Wilderness area" et de "Soil type, on remarque que Wilderness area 2 et 4 ne représentent respectivement que 5.1 et 6.4 % des observations.\
-\
-
-Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numero 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
 
 ## Relations entre X & Y 
 
-Première estimation des relations possibles entre les variables quantitatives explicatives et la variable réponse.
 
 ```{r dataCov2, include=TRUE, fig.height=3, fig.width=8}
 # variables X quantitatives
 par(mfrow=c(1,2))
-for (i in 1:10) {
+for (i in c(1,6)) {
   boxplot(Xforest[,i]~Cov_type,ylab=colnames(Xforest)[i],xlab = "Cover type")
 }
 
 ```
-
-Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
-
-plotter dans quarto : i = 1 et 6 les variables ou var semble avoir le plus d'impact
 
 
 ## Méthodes testées
@@ -642,30 +630,33 @@ $Xs$ les variables prédictives\
 
 ## Analyse des interactions entre les variables X
 
-```{r}
+```{r,echo=FALSE,include=FALSE}
 # variables X qualitatives
 temp_forest <- Xforest
-temp_forest[,11:54][temp_forest[,11:54] == 0] <- NA
+temp_forest[,11:54][temp_forest[,-c(1:10)] == 0] <- NA
 
 temp_forest <- pivot_longer(temp_forest,cols = seq(15,54),names_to = "Soil_type",values_to = "pres_abs", values_drop_na = TRUE)
-#moche mais fonctionne
 temp_forest <- pivot_longer(temp_forest,cols = seq(11,14),names_to = "Wilderness_area",values_to = "pres_ab", values_drop_na = TRUE)
 temp_forest <- temp_forest[,-c(12,14)]
 
+```
+
+
+```{r}
+
 # Interactions possibles entre les variables qualitatives et quantitatives
 
-for (i in 1:10) {
-  par(mfrow=c(1,2))
-  boxplot(temp_forest[,i]~temp_forest$Wilderness_area, varwidth = TRUE, ylab = colnames(temp_forest)[i], xlab = "Wilderness area", main = "", xaxt = "n")
- boxplot(temp_forest[,i]~temp_forest$Soil_type, varwidth = TRUE, ylab = colnames(temp_forest)[i], xlab = "Soil type ", main = "", xaxt = "n")
-}
+par(mfrow=c(1,2))
+boxplot(temp_forest$Horizontal_Distance_To_Fire_Points~temp_forest$Wilderness_area, varwidth = TRUE, ylab = "Horizontal_Distance_To_Fire_Points", xlab = "Wilderness area", main = "", xaxt = "n")
+boxplot(temp_forest$Horizontal_Distance_To_Roadways~temp_forest$Wilderness_area, varwidth = TRUE, ylab = colnames(temp_forest)[i], xlab = "Soil type ", main = "", xaxt = "n")
 
 rm(temp_forest)
 
 
 ```
 
-Interactions between qualitative X and quantitative + orhtogonality of the plan studied in another file to avoid importing multiple datasets every time
+
+## Analyse des interactions entre les variables X
 
 Interactions potentielles :\
 - Horizontal distance to fire, Wilderness area\
@@ -682,7 +673,6 @@ corrplot.mixed(M,upper="square",lower.col="black", tl.col="black",cl.cex = 0.7,t
 Xforest_red <- Xforest[,-9]
 ```
 
-L'ombre à 3h est corrélée avec un coefficient r=-0.78 avec l'ombre à 9h. Si on prend un seuil à 0.7 on retire cette l'ombre à 3h arbitrairement.
 
 ## Centrer et réduire les variables quantitatives
 
@@ -691,19 +681,17 @@ Xforest_red_cr <- Xforest_red
 Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,center = TRUE, scale = TRUE))
 ```
 
-## Modèle
+## Points de vigilance
 
--   Le modèle linéaire ne peut pas tourner sur 387341 données, donc on fait plusieurs fois tourner sur environ 7000 données. Dans l'idéal on le fait tourner environ 550 fois pour que le total des données d'entraînement représente environ 2/3 des données.\
+-   Réduction du jeu de données \ 
 
--   Le plan n'est pas orthogonal, on n'utilise pas d'interactions ou alors on en utilise mais on fait attention aux paramètres des interactions (Beta) qui peuvent être moins fiables surtout sur les modalités rares dans l'interprétation (en calculant la variance des Beta pour un ensemble de modèles crées).\
+-   Plan non orthogonal \ 
 
--   On sélectionne les variables en ajouttant une pénalité lasso au modèle.
+-   Sélection de variables avec un pénalité lasso \ 
 
--   Pour tester la qualité du modèle on s'intéresse à l'accuracy moyenne, soit le nombre moyen de cover types correctement prédits sur l'ensemble des modèles simulés divisé par le nombre total de cover type testé.
+-   Comparaison par mesure d'accuracy
 
 ## Ecriture du modèle
-
-On utilise une fonction qui optimize automatiquement la valeur du tuning parameter pour la pénalité lasso.
 
 ```{r fullmodel,include=TRUE}
 
@@ -763,8 +751,6 @@ for (b in 1:rep) {
   Xtrain_inter <- model.matrix(f, cbind(Xtrain,Ytrain))[, -1]
   Xtest_inter <- model.matrix(f2, cbind(Xtest,Ytest))[, -1]
   # formulation du modèle avec une pénalité lasso
-  
-  #Xtrain <- matrix(as.numeric(as.matrix(Xtrain)),nrow = nrow(Xtrain)) #pour un modèle sans intéractions
   mod <- cv.glmnet(Xtrain_inter,Ytrain, alpha=1,family = "multinomial")
   L_coeffs[[b]] <- coef(mod, s = "lambda.min") #on choisit la pénalité lasso optimale pour le modèle basé sur 
   
@@ -783,15 +769,16 @@ T2<-Sys.time()
 
 ```
 
-Plusieurs difficultés ont été rencontrées lors de cette étape: \ 
-1- Comment choisir la pénalité lasso: test avec l'AIC, le BIC, otimisation par R basée sur ... \ 
-2- Combien d'intéractions intégrer dans le modèle, plus il y avait d'intéractions, plus le temps de calcul augmentait. Nous avons sélectionnées quelques interactions en exemple \ 
-3- Comment interpréter les interactions sachant que le plan n'est pas orthogonnal \ 
-3- Commment faire l'échantillonnage
+## Difficultés
 
-Calculer le pourcentage de bonne prédiction moyen par les modèle entrainés sur différents jeux de données d'entrainement, premiere colonne pour l'ensemble des données, puis pourcentage de 1 prédits qui étaient vraiment des 1 et le pourcentage 1 prédits parmis toutes les valeurs où 1 devait etre prédit
+- Temps de calculs \ 
+- Comment sélectionner le tunning parameter \ 
+- Comment interpréter les coefficients des intéractions \ 
+- Quel échantillonnage choisir \ 
 
-```{r}
+## Résultats: accuracy
+
+```{r, include=FALSE,echo=FALSE}
 
 df_mod <- matrix(c(rep(seq(1,7),7),
                    rep(1,7),
@@ -827,6 +814,10 @@ for (i in 1:rep) {
 }
 df_mod_pourc<-df_mod
 df_mod_pourc$Freq <-df_mod_pourc$Freq/rep
+
+```
+
+```{r}
   
 ggplot(df_mod_pourc, aes(x = Observed, y = Predicted, fill = Freq))+
   geom_tile()+
@@ -847,13 +838,11 @@ print(paste("Sur dix répétitions, l'accuracy est de :", mean(accuracy_mod)," e
 
 ```
 
-Il semble y avoir beaucoup de confusion entre les classes 1,2 et 7. La classe 3 est plutôt bien prédite. Les classes les plus rares sont mal prédites: 4 est assignée à de nombreuses autres classes, 5 est assignée à la classe 2 et 6 aux classes 2 et 3. 
-
-Malgrès que des classes soient très peu représentés dans le jeu de donnée, en équilibrant l'échantillonnage, on peut voir que ces classes sont tout de même prédites dans le modèle. Mais le problème est qu'elles sont sur-représentées dans les sorties du modèle. Par exemple le modèle a détecté correctement 77.7% des cover-type 4 qui était dans le jeu de données d'entrainement. Cependant seulement 15% des individus prédits dans le cover type 4 étaient corrects, cela signifie que de trop d'individus ont été classé dans le type 4. Ce constat vaut pour les classes 5,6 et 7 qui sont toutes plutôt rares.
+## Résultats: sélection des variables
 
 On regarde les variables qui ressortent moins de 80% des fois
 
-```{r}
+```{r, include=FALSE,echo=FALSE}
 occurence_var <- matrix(0,nrow = 70,ncol=7) # contient en ligne la somme des coefficients Beta non nuls au cours des répétitions du modele pour chaque classe en colonne
 
 for (i in 1:rep) {
@@ -874,22 +863,12 @@ for (i in 1:7) {
 
 
 ![](\selectvar.png)
-Représentées en bleu, les variables qui entrent en compte dans la prédiction des types de couvertures (de 1 à 7) au  moins 80% des fois, en rouge les autres. La colonne de droite correspond aux variables utilisées dans l'algorithme de random forest, en rouge celle dont la contribution est < à XXX et en bleu celle dont elle est supérieure à XXX. Les variables en plus claires représentent les variables propres à la régression linéaire soit: les interactions et l'intercept. \ 
-  
-  
 
-Pour le modèle linéaire, les variables semblent quasiment toutes jouer un rôle dans la prédiction d'au moins une des classes, excepté les variables de type de sol 26 et 28, et l'interaction entre Horizontal distance to roadway et wilderness area?. Sans oublier la variable ombre à 3 heures retirée précedemment.  
-Trois variables ont de l'importance pour au moins 5 des type de couvert: horizontal distance to roadway, ainse que les intéractions elevation:wilderness area 2 et horizontal distance to roadway: wilderness area 4. \ 
+## Résultats: interprétation des coefficients d'intéractions
 
-On ne remarque pas de motif particulier dans les variables importantes et pas de similitude avec les variables sélectionnées par le random forest.
+Pour les deux intéractions importantes:
 
-
-
-## Attention à l'interprétation des coefficients d'intéractions
-
-Pour les deux intéractions importantes, on regarde si les coefficients varient selon les simulations. On fait attention à cela notamment parce que le plan n'est pas orthognoal
-
-```{r}
+```{r, include=FALSE,echo=FALSE}
 el_wa <- matrix(NA,nrow = rep,ncol = 7)
 hdt_wa <- matrix(NA,nrow = rep,ncol = 7)
 for (i in 1:10) {
@@ -909,10 +888,12 @@ colnames(interactions)<- c("moyenne Elevation:W area 2","ecart type Elevation:W 
 
 row.names(interactions)<- c("Cover type 1","Cover type 2","Cover type 3","Cover type 4","Cover type 5","Cover type 6","Cover type 7")
 
-print(interactions)
-
 ```
-Les écarts types des coefficients entre chaque simulations sont très grands, il devent donc difficile d'interpréter ces coefficients
+
+```{r}
+print(interactions)
+```
+
 
 ## Comparaison des méthodes et conclusion
 
