@@ -12,10 +12,9 @@ format:
 
 Prédiction des couverts forestiers à partir de variables cartographiques.
 
-![](C:/Users\lucia\OneDrive\Documents\M2\Cours\MLB\GITHUB_MLB\MLB_forest\couverture.jpg)
+![](C:/Users%5Clucia%5COneDrive%5CDocuments%5CM2%5CCours%5CMLB%5CGITHUB_MLB%5CMLB_forest%5Ccouverture.jpg)
 
 ## Pourquoi utiliser le **machine learning** ?
-
 
 -   Pour répertorier le couvert
 
@@ -256,8 +255,8 @@ y_test = y_prob = NULL
 for (b in 1:B){
   set.seed(b)
   
-  itrain <- unlist(part_data(forest)[1])
-  itest <- unlist(part_data(forest)[2])
+  itrain <- unlist(part_data(forest,freq_cover)[1])
+  itest <- unlist(part_data(forest, freq_cover)[2])
   
   Xs_train = scale(pcaXforest$ind$coord[itrain,])
   Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
@@ -590,7 +589,7 @@ plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB"
 
 -   Simulation longue mais qui augmente la précision des prédictions
 
-    ##  Methodes model-driven
+    ## Methodes model-driven
 
 -   Modèle multinomial
 
@@ -850,17 +849,30 @@ En plus de la variable ombre à 3 heures.
 
 ## Comparaison des méthodes et conclusion
 
+Selection variable random forest multinom: lesquelles sont importantes
+
 \--\> ça sera à classer par ordre croissant d'accuracy :)
 
-| Méthode | Accurracy   | Remarques                                  |
-|---------|-------------|--------------------------------------------|
-| K-means | 0.55        | Toutes les classes ne sont pas prédites... |
-| K-NN    | 0.37 à 0.57 | Résulats moyens                            |
-|         |             |                                            |
-|Decision tree         | 0.72 à 0.87            |                                            |
-| Random forest      | 0.78 à 0.98            |                                            |
-
+| Méthode       | Accurracy   |     |
+|---------------|-------------|-----|
+| K-means       | 0.55        |     |
+| K-NN          | 0.37 à 0.57 |     |
+|               |             |     |
+| Decision tree | 0.72 à 0.87 |     |
+| Random forest | 0.78 à 0.98 |     |
 
 IDEE CONCLU:
-- Pour les datas driven methods: + de données = + accuracy
-- Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
+
+\- Pour les datas driven methods: + de données = + accuracy - Différence KNN
+
+-   Mais pas possible d'utiliser toutes les données pour regression:
+
+\- Random forest/KNN : la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
+
+-   Methode regression multinoamiale comparable au knn et random forest avec données: normalemt équivalent
+
+-   Conclu final:
+
+-   Ce qui aurait être fait en continuité de la multinom réseau de neurones. Nous on a pas fait reseau de neurone fait dans comparaison à l'article, eux ils ont fait le réseau de neurone --\> comparer leur accuracy. Apparament modele plus simple prédise mieux
+
+Donc en conclusion pour ce jeu de données ce qui marche bien, c'est bcp de données et methode simple
