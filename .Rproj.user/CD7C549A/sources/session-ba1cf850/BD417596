@@ -3,7 +3,7 @@
     "path": "C:/Users/youy0/Desktop/git/MLB_forest/script_cov_type.Rmd",
     "project_path": "script_cov_type.Rmd",
     "type": "r_markdown",
-    "hash": "1433480663",
+    "hash": "1619114316",
     "contents": "",
     "dirty": false,
     "created": 1699636008698.0,
@@ -13,15 +13,15 @@
         "source_window_id": "",
         "Source": "Source",
         "docOutlineVisible": "1",
-        "cursorPosition": "520,0",
-        "scrollLine": "514"
+        "cursorPosition": "1053,173",
+        "scrollLine": "1052"
     },
     "folds": "",
-    "lastKnownWriteTime": 1699823275,
+    "lastKnownWriteTime": 1699824544,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1699823275879,
+    "last_content_update": 1699824544209,
     "read_only": false,
     "read_only_alternatives": []
 }
