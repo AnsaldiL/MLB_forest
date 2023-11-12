@@ -754,20 +754,6 @@ Les résultats de la validation croisée montrent qu'il n'y a pas de surapprenti
 
 
 
-#CONCLUSION DU PROJET
-
-Après avoir tester différente approche dans le but de maximiser l'accuracy des prédictions des Cover_Type, on constate que la précision va de 55% à 96%. Lorsque l'on travaille avec le sous jeu de données, on constate que les méthodes arbre de décision, random et regression multinomiale donnent des résultats relativement proche, autour de 75% d'accuracy. Seule la méthode des KNN est moins efficace.La réduction de la dimension suite à la PCA a engendrer une perte d'information et donc une diminution de la précision de l'algorithme. Pour les data driven méthodes, les arbres de décisions et les Random forest, c'est le fait de travailler avec un nombre conséquent de données qui permet d'améliorer l'accuracy et ainsi d'obtenir 96% de bonnes prédiction pour les Random Forest. A cause de temps de simulation trop élevée, nous avons pas pu simuler la regression multinomiale avec toutes les données, cela équivaut à simuler 83 fois le modèle présenté. Paralléliser et ainsi diminuer le temps de simulation aurait pu permettre de comparer ce résutlat à celui des Random Forest et ainsi de savoir lequels des deux algorithmes est le plus efficace en terme de prédiction.  
-  Dans la continuité de la regression multinomiale, nous aurions pu réaliser un réseau de neurones. Cependant, l'article associé à ce jeu de données à utiliser cette approche et a obtenu une accuracy moyenne de 71%. Les auteurs se disent deçus de ce résultat, et pense que cela provient de la diversité des variables (qualitative et quantitative), du déséquilibre de fréquence des Cover_Type et de leur difficulté à exploiter tout le jeu de données au vu des temps de simulations.
-  
-  Ainsi, malgré le fait que le jeu de données soit conséquent nous ai posé des problèmes pour l'exploration de différents scénarii, la quantité de données est enfaite le point fort qui permet d'obtenir cette accuracy de 96% avec les Random Forest. Ce jeu de données qui a la particularité d'être conséquent, rend donc l'algorithme des Random Forest, une data driven method, le plus performant tout en offrant un temps de simulation raisonnable. 
-  Si le jeu de données avait été moins conséquent, une approche data driven n'aurai peut etre pas été la plus performante. Une approche model driven aurait peut être été plus efficace, notamment pour prédire les classes minoritaires. 
-
-
-
-
-
-
-
 # Methodes model-driven
 
 La méthode model-driven étudiée est le modèle multinomial.
@@ -1067,5 +1053,13 @@ Les écarts types des coefficients entre chaque simulations sont très grands, i
 | Decision tree | 0.72 à 0.87 |                                            |
 | Random forest | 0.78 à 0.98 |                                            |
 
-IDEE CONCLU: - Pour les datas driven methods: + de données = + accuracy - Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
+
+Après avoir tester différente approche dans le but de maximiser l'accuracy des prédictions des Cover_Type, on constate que la précision va de 55% à 96%. Lorsque l'on travaille avec le sous jeu de données, on constate que les méthodes arbre de décision, random et regression multinomiale donnent des résultats relativement proche, autour de 75% d'accuracy. Seule la méthode des KNN est moins efficace.La réduction de la dimension suite à la PCA a engendrer une perte d'information et donc une diminution de la précision de l'algorithme. Pour les data driven méthodes, les arbres de décisions et les Random forest, c'est le fait de travailler avec un nombre conséquent de données qui permet d'améliorer l'accuracy et ainsi d'obtenir 96% de bonnes prédiction pour les Random Forest. A cause de temps de simulation trop élevée, nous avons pas pu simuler la regression multinomiale avec toutes les données, cela équivaut à simuler 83 fois le modèle présenté. Paralléliser et ainsi diminuer le temps de simulation aurait pu permettre de comparer ce résutlat à celui des Random Forest et ainsi de savoir lequels des deux algorithmes est le plus efficace en terme de prédiction.  
+  Dans la continuité de la regression multinomiale, nous aurions pu réaliser un réseau de neurones. Cependant, l'article associé à ce jeu de données à utiliser cette approche et a obtenu une accuracy moyenne de 71%. Les auteurs se disent deçus de ce résultat, et pense que cela provient de la diversité des variables (qualitative et quantitative), du déséquilibre de fréquence des Cover_Type et de leur difficulté à exploiter tout le jeu de données au vu des temps de simulations.
+  
+  Ainsi, malgré le fait que le jeu de données soit conséquent nous ai posé des problèmes pour l'exploration de différents scénarii, la quantité de données est enfaite le point fort qui permet d'obtenir cette accuracy de 96% avec les Random Forest. Ce jeu de données qui a la particularité d'être conséquent, rend donc l'algorithme des Random Forest, une data driven method, le plus performant tout en offrant un temps de simulation raisonnable. 
+  Si le jeu de données avait été moins conséquent, une approche data driven n'aurai peut etre pas été la plus performante. Une approche model driven aurait peut être été plus efficace, notamment pour prédire les classes minoritaires. 
+
+
+
 
