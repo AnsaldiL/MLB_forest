@@ -76,7 +76,24 @@ pcaXforest <- PCA(Xforest, ncp = 2)
 
 
 ```
- qualitatives
+
+```{r,include=FALSE}
+#str(forest)
+100*table(forest$Cover_Type)/sum(table(forest$Cover_Type))
+```
+
+
+## Valeurs extremes de $X$
+
+```{r dataCov1, include=TRUE}
+par(mfrow=c(2,3))
+for (i in 1:6) {
+  boxplot(forest[,i],pch=16,col='salmon',xlab=colnames(forest)[i])
+}
+
+```
+
+## Répartition des individus pour les variables qualitatives
 
 ```{r}
 quali <- apply(forest[,11:54], MARGIN = 2, table)
@@ -677,6 +694,16 @@ Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,
 
 ## Points de vigilance
 
+-   Réduction du jeu de données  
+
+-   Plan non orthogonal  
+
+-   Sélection de variables avec un pénalité lasso  
+-   Réduction du jeu de données
+
+-   Plan non orthogonal
+
+-   Sélection de variables avec un pénalité lasso
 
 -   Comparaison par mesure d'accuracy
 
@@ -756,6 +783,17 @@ T2<-Sys.time()
 (Tdiff= difftime(T2, T1))
 
 ```
+
+## Difficultés
+
+-   Temps de calculs  
+-   Comment sélectionner le tunning parameter  
+-   Comment interpréter les coefficients des intéractions  
+-   Quel échantillonnage choisir  
+-   Temps de calculs
+-   Comment sélectionner le tunning parameter
+-   Comment interpréter les coefficients des intéractions
+-   Quel échantillonnage choisir
 
 ## Résultats: accuracy
 
@@ -842,6 +880,9 @@ for (i in 1:7) {
 
 ```
 
+![](\selectvar.png)
+![](C:/Users/lucia/OneDrive/Documents/M2/Cours/MLB/GITHUB_MLB/MLB_forest/selectvar.jpg)
+
 ## Résultats: interprétation des coefficients d'intéractions
 
 Pour les deux intéractions importantes:
@@ -873,3 +914,32 @@ print(interactions)
 ```
 
 ## Comparaison des méthodes et conclusion
+
+| Méthode           | Accurracy   | Remarques                                  |
+|----------------|----------------|-----------------------------------------|
+| K-means           | 0.55        | Toutes les classes ne sont pas prédites... |
+| K-NN              | 0.37 à 0.57 | Résulats moyens                            |
+| Multinomial model | 0.72        |                                            |
+| Decision tree     | 0.72 à 0.87 |                                            |
+| Random forest     | 0.78 à 0.98 |                                            |
+| Méthode       | Accurracy   |
+|---------------|-------------|
+| K-means       | 0.55        |
+| K-NN          | 0.57        |
+| Regression    | 0.72        |
+| Decision tree | 0.72 à 0.87 |
+| Random forest | 0.78 à 0.96 |
+
+\- La PCA pour les KNN entraine une perte d'information par rapport RF et à la regression. Algorithme pas assez précis pour distinguer les différences entre classes
+
+\- Pour les datas driven methods KNN/Random forest : travailler avec plus de données apporte de la précision mais pas possible d'utiliser toutes les données pour regression.
+
+\- Rf et repression donne des résultats de précision et de variables sélectionées équivalent avec le sous jeu de données, réaliser la regression avec plus de données est une piste d'amélioration
+
+\- Les forêts aléatoires donne la meilleure accuracy
+
+## Comparaison avec l'article
+
+\- Réseau de neurone avec 71% d'accuracy
+
+**- La grande quantité de données rend les data driven methods les plus performantes avec des temps de simulation raisonnable.**

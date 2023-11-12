@@ -1,0 +1,299 @@
+---
+title: "Multinomial regression v2"
+author: "Youna"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2) # graph package
+library(tinytex) # Pour la sortie pdf
+library(corrplot)# Correlation matrix calculus
+library(glmnet) # multinomiale avec pénalité lasso
+```
+
+Idée d'exploration du jeu de données:
+Knn et Knn sur variables de PCA
+1) data driven:
+arbre de décision et généralisation en foret aléatoire (généralement meilleure en prédictions)
+2) model driven:
+modèle linéaire généralisation en réseau de neuronnes
+
+
+
+# Import data 
+```{r}
+setwd("C:/Users/youy0/Desktop/master/S9/MLB/Projet/data")
+Cov_type <- read.table("_decompressee_covtype.data",header = F,sep = ",")
+
+a <- rep("Soil_Type_",40)
+for (i in 1:40) {
+  a[i]<-paste0(a[i],as.character(i))
+} 
+name <- c("Elevation",
+          "Aspect",
+          "Slope",
+          "Horizontal_Distance_To_Hydrology",
+          "Vertical_Distance_To_Hydrology",
+          "Horizontal_Distance_To_Roadways",
+          "Hillshade_9am",
+          "Hillshade_Noon",
+          "Hillshade_3pm",
+          "Horizontal_Distance_To_Fire_Points",
+          "Wilderness_Area_1",
+          "Wilderness_Area_2",
+          "Wilderness_Area_3",
+          "Wilderness_Area_4",
+          a,
+          "Cover_Type")
+colnames(Cov_type)<- name
+Cov_type[,11:55] <- lapply(Cov_type[,11:55],function(X) as.factor(X)) 
+# colSums(is.na(Cov_type)) 
+# str(Cov_type)
+```
+
+Il n'y a pas de NA et les variables sont au bon format:  
+- factor pour les variables qualitatives,  
+- int pour les variables quantitatives  
+On veut faire une régréssion multinomiale.
+
+# Checking the dataset
+## Répartition des individus dans chaque cover type
+
+```{r dataY, include=TRUE}
+# Number of 0 and 1 in Y
+table(Cov_type$Cover_Type)
+table(Cov_type$Cover_Type)/length(Cov_type$Cover_Type) # en proportions
+```
+Les classes 3, 4, 5, 6, 7 représentent respectivement 6.2, 0.5, 1.6, 3.0 et 3.5 % des données, nous considérons ces classes come étant plutôt rares comparées aux classes 1 et 2 qui représentent à elles deux 85% des données. 
+
+## Outliers in $X$ 
+
+```{r dataCov, include=TRUE}
+par(mfrow=c(2,3))
+for (i in 1:10) {
+  # Cleveland plot
+  boxplot(Cov_type[,i],pch=16,col='blue',xlab=colnames(Cov_type)[i])
+}
+
+```
+
+Il n'y a pas de données abbérantes.
+
+## Combien d'occurence dans les variables qualitatives
+```{r}
+quali <- apply(Cov_type[,11:54], MARGIN = 2, table)
+round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2) #quel pourcentage des observations appartient à chaque classe de "Wilderness area" et de "Soil type)
+```
+On remarque que Wilderness area 2 et 4 ne représentent respectivement que 5.1 et 6.4 % des observations.  
+Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numero 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
+
+
+## Relations between X & Y
+Première estimation des relations possibles entre les variables quantitatives explicatives et la variable réponse.
+```{r dataCov, include=TRUE, fig.height=3, fig.width=8}
+
+for (i in 1:10) {
+  par(mfrow=c(1,1))
+  boxplot(Cov_type[,i]~Cov_type$Cover_Type,ylab=colnames(Cov_type)[i],xlab = "Cover type")
+}
+
+```
+
+
+## Analysis of possible interactions between all Xs independent variables
+
+Interactions between qualitative X and quantitative + orhtogonality of the plan studied in another file to avoid importing multiple datasets every time --> R souffre un peu la 
+
+Interactions:  
+- Horizontal distance to fire, Wilderness area  
+- Horizontal distance to Roadway, Wilderness area  
+- Slope, Wilderness area  
+- Slope, soil type  
+- Elevation, Wilderness area  
+
+## Analysis of correlation between quantitative X's
+```{r}
+M<-cor(Cov_type[,1:10])
+corrplot.mixed(M,upper="square",lower.col="black", tl.col="black",cl.cex = 0.7,tl.cex = 0.6,number.cex =0.7)
+Cov_red <- Cov_type[,-9]
+```
+Shade at 3 is -0.78 corrélated with shade at 9 I remove it (treshold = 0.7)
+
+# Modèle
+
+Le plan n'est pas orthogonal, on n'utilise pas d'interactions ou alors on en utilise mais on fait attention aux paramètres des interactions (Beta) qui peuvent être moins fiables surtout sur les modalités rares dans l'interprétation -> on peut calculer la variance des Beta pour l'ensemble des modèles crées, on peut trier les variables avec drop1 ou avec la pénalité lasso
+
+- faire nombreux modeles sur peu de données en forcant à avoir tous les cover type (sur 2/3 des données environ)
+- calculer la variance de chaque parametre du modèle
+- calculer les erreurs moyennes
+- tester si il y a des interactions entre les variables
+
+Le modèle linéaire ne peut pas tourner sur 387341 données, donc on fait plusieurs fois tourner sur 7000
+
+## Fonction de sélection des jeux de donnée d'entrainement et de validation - sélection aléatoire type Monte Carlo
+
+```{r}
+part_data <- function(data,freq){
+  # prend en entree le jeu de donnee à echantillonner 
+  # renvoie les indices des individus de l'echantillon d'entrainement et de l'echantillon de validation
+  nb_indiv <- length(data[,1])
+  itrain <- c()
+  itest <- c(1:nb_indiv)
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 15:54) { #les colonnes 14 à 53 sont les colonnes "soil type"
+    itrain <- c(itrain,sample(x = which(data[,i] == 1 ),size = 3)) 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 11:14) { #les colonnes" 14 à 53 sont les colonnes "soil type""Wilderness_area"
+    itrain <- c(itrain,sample(x = setdiff(which(data[,i] == 1 ),itrain),size = 3)) #dans les données pas deja echantilonnee 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 1000 observations par type de recouvrement végétal
+  for (i in 1:7) {
+    itrain <- c(itrain,sample(x = setdiff(which(data$Cover_Type == i),itrain),size = 1000))
+  }
+  
+  itest <- setdiff(itest,itrain)
+  itest <- sample(itest,3560) 
+  
+  return(list(itrain,itest))
+}
+
+```
+
+i train possede 7132 mesures et i test 3560 (on a donc environ 10700 données pour chaque experience avec 2/3 de données d'entrainement et 1/3 de données test).
+
+
+```{r}
+part_data_freq <- function(data,freq = rep(1/7,7)){
+  # prend en entree le jeu de donnee à echantillonner et un vecteur de fréquences pour chaque classe dans l'ordre (1 à 7)
+  # valeur par défaut, toutes les classes sont échantillonnées à peu près à la meme fréquence
+  # renvoie les indices des individus de l'echantillon d'entrainement et de l'echantillon de validation
+  nb_indiv <- length(data[,1])
+  itrain <- c()
+  itest <- c(1:nb_indiv)
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 15:54) { #les colonnes 14 à 53 sont les colonnes "soil type"
+    itrain <- c(itrain,sample(x = which(data[,i] == 1 ),size = 3)) 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 3 observations par type de sol
+  for (i in 11:14) { #les colonnes" 14 à 53 sont les colonnes "soil type""Wilderness_area"
+    itrain <- c(itrain,sample(x = setdiff(which(data[,i] == 1 ),itrain),size = 3)) #dans les données pas deja echantilonnee 
+  }
+  
+  # on force l'echantillon d'entrainement à avoir au moins 1000 observations par type de recouvrement végétal
+  nb <- freq*7000
+  for (i in 1:7) {
+    itrain <- c(itrain,sample(x = setdiff(which(data$Cover_Type == i),itrain),size = nb[i]))
+  }
+  
+  itest <- setdiff(itest,itrain)
+  itest <- sample(itest,3560) 
+  
+  return(list(itrain,itest))
+}
+
+```
+
+## Centrer et réduire les variables quantitatives
+
+```{r}
+Cov_red_cr <- Cov_red
+Cov_red_cr[1:9] <- apply(Cov_red_cr[1:9],MARGIN = 2,function(X) scale(X,center = TRUE, scale = TRUE))
+```
+
+## Ecriture du modèle
+
+On utilise une fonction qui calcule automatiquement la valeur du tuning parameter pour la pénalité lasso
+
+```{r fullmodel,include=TRUE}
+
+
+rep <- 10 #normalement sur 550 essais mais tournerait environ 36 heures
+L_coeffs <- list()
+accuracy <- matrix(NA,nrow = rep,ncol = 15)
+
+T1<-Sys.time()
+for (b in 1:rep) { 
+  # subset de données 
+  set.seed(b)
+  select_indiv <- part_data(Cov_type)
+  Ytrain <- Cov_red_cr[select_indiv[[1]],54] 
+  Ytest <- Cov_red_cr[select_indiv[[2]],54] 
+  Xtrain <- Cov_red_cr[select_indiv[[1]],-54] 
+  Xtest <- Cov_red_cr[select_indiv[[2]],-54]
+  
+  # Model formulation avec une pénalité lasso
+  Xtest <- matrix(as.numeric(as.matrix(Xtest)),nrow = nrow(Xtest))
+  Xtrain <- matrix(as.numeric(as.matrix(Xtrain)),nrow = nrow(Xtrain))
+  # Ytrain <- matrix(as.numeric(as.matrix(Ytrain)),nrow = nrow(Ytrain))
+  mod <- cv.glmnet(Xtrain,Ytrain, alpha=1,family = "multinomial")
+  L_coeffs[[b]] <- coef(mod, s = "lambda.min")
+  ychap <- predict(mod, Xtest,type = "class",s = "lambda.min")
+  
+  #le modèle fai-il de bonne predictions
+  acc <- 100*length(which(ychap == Ytest))/3560#on compte le nombre de fois où l'algorithme prédit le bon cover type
+  
+  for (i in 1:7) {
+    acc<- c(acc,
+            100*length(which(ychap == Ytest & Ytest == i))/length(which(ychap == i)),
+            100*length(which(ychap == Ytest & Ytest == i))/length(which(Ytest == i)))
+    
+  }
+  accuracy[b,] <- acc
+
+}
+
+T2<-Sys.time()
+
+(Tdiff= difftime(T2, T1))
+
+
+```
+
+Calculer le pourcentage de bonne prédiction moyen par les modèle entrainés sur différents jeux de données d'entrainement, premiere colonne pour l'ensemble des données, puis pourcentage de 1 prédits qui étaient vraiment des 1  et le pourcentage 1 prédits parmis toutes les valeurs où 1 devait etre prédit
+
+```{r}
+res <- matrix(apply(accuracy,2,mean),nrow = 1)
+colnames(res) <- c("mean_accuracy","cov_type1a","cov_type1b","cov_type2a","cov_type2b","cov_type3a","cov_type3b","cov_type4a","cov_type4b","cov_type5a","cov_type5b","cov_type6a","cov_type6b","cov_type7a","cov_type7b")
+res
+```
+
+Malgrès que des classes soient très peu représentés dans le jeu de donnée, en équilibrant l'échantillonnage, on peut voir que ces classes sont tout de même prédites dans le modèle. Mais le problème est qu'elles sont sur-représentées dans les sorties du modèle. Par exemple le modèle a détecté correctement 77.7% des cover-type 4 qui était dans le jeu de données d'entrainement. Cependant seulement 15% des individus prédits dans le cover type 4 étaient corrects, cela signifie que de trop d'individus ont été classé dans le type 4. Ce constat vaut pour les classes 5,6 et 7 qui sont toutes plutôt rares.
+  
+  
+
+On pourrait regarder AUC mais misclassification costs are the same for different types of mistakes (on ne cherche pas a eviter les faux négatifs par exemple donc pas besoin de checker la sensibilité et la spécificité).
+
+
+On regarde les variables qui ressortent moins de 80% des fois
+
+```{r}
+occurence_var <- matrix(0,nrow = 54,ncol=7) # contient en ligne la somme des coefficients Beta non nuls au cours des répétitions du modele pour chaque classe en colonne
+
+for (i in 1:rep) {
+  for (j in 1:7) {
+    occurence_var[(which(L_coeffs[[i]][[j]] != 0)),j] <- (occurence_var[(which(L_coeffs[[i]][[j]] != 0)),j]+ 1)
+  }
+  
+}
+#quelles variables ne sont pas présentes plus de 80% des fois ? 
+occurence_var_pourcent <- apply(occurence_var, c(1,2), function(X) X*100/rep)
+occurence_inf80 <- list()
+for (i in 1:7) {
+  occurence_inf80[[i]] <- c("intercept",colnames(Cov_red))[which(occurence_var_pourcent[,i]<80)]
+  print(occurence_inf80[[i]])
+}
+
+
+```
+
+
+remarque: modification possible: sortir les probabilités et attribuer les classes rares pour certaines probabilités même si ce sont les probabilités les plus fortes
+pour diminuer la sensibilité du modèle à ces types
+
+
