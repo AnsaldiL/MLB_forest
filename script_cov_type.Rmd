@@ -362,6 +362,390 @@ Le résultat est meilleur lorsque l'ensemble du jeu de donnée est utilisé et e
 Seules les classes 1 et 2 sont bien prédites, soit les classes les plus représentées. 
 La méthode n'est pas très efficace : accuracy de 0.36 avec le partionnement proposé et 0.57 avec les tiers. Cela s'explique par le grand déséquilibre dans les données et la sous-représentation de certaines classes par rapport aux autres.
 
+## Arbre de décision
+### Introduction
+Dans un second temps, nous allons utiliser des data driven models mais cette fois-ci sans réduction de la dimension. Nous allons mettre en oeuvre un algorithme d'arbre de décision, notamment pour la facilité d'implémentation et d'interprétation. Il s'agit ici en l'occurence d'un arbre de classification puisque la variable à prédire est qualitative. Dans un but d'abord exploratoire, on réalisera les simulations avec un sous jeu de données construit pour être représentatif du jeu de données initial (fonction part_data), qui entrainera des temps de simulations moins élevés. Afin de prévenir et détecter du sur-apprentissage on mettra en place une méthode de validation croisée en simulant l'algorithme N fois avec des jeu d'apprentissages et de test tirés au hasard dans le sous jeu de données. 
+
+### Simulation
+On commence d'abord par la simulation d'un arbre peu profond avec le paramètre par défaut cp=0.1
+
+```{r}
+N=10
+
+forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+accuracy_scores <- numeric(N) #Initiation du vecteur d'accuracy
+
+for (b in 1:N) { #Boucle pour la validation croisée
+  res=part_data(forest,freq_cover) #Sélection d'un sous jeu de données représentatif
+  itest=res[[2]] #Récuperation des indices des lignes pour le jeu de test
+  itrain=res[[1]]#Récuperation des indices des lignes pour le jeu d'entrainement
+  forest_test <-forest[itest,] #Création du jeu de test
+  forest_train <-forest[itrain,] #Création du jeu d'entrainement
+
+  #Exctraction des variables explicatives
+  X_forest_test <-forest_test[,1:54] 
+  X_forest_train <-forest_train[,1:54]
+  
+  #Extraction de la variable à prédire
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
+  
+  #Algorithme de l'arbre de décision
+  tree_model <- rpart(Cover_Type~., data = forest_train, method="class",control = rpart.control(cp = 0.1)) 
+  
+  #La fonction rpart contrôle permet de créer des arbres plus profond lorsque cp est faible, tout en pénalisant la compléxité pour prévenir le surapprentissage.
+  
+  # Prédiction sur jeu de test à partir du modèle
+  y_pred <- predict(tree_model,forest_test, type='class')
+  
+  #Récupération du score de précision
+  accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
+
+}
+
+
+```
+
+
+## Visualisation de l'arbre de décision
+```{r}
+  op = par(mfrow=c(1,2), cex=0.5)
+#Affichage de l'arbre
+  plot(tree_model, uniform = TRUE, branch = 0.5, margin = 0.2)
+  text(tree_model, all = FALSE, use.n = FALSE)
+#Relation erreur et valeur de cp
+  plotcp(tree_model)
+```
+
+On observe un arbre très simple, les prédictions sont faites à partir d'une seule variable Elévation, parmi les 54 variables explicatives possibles et il y a un seul noeud. Ainsi, seules deux classes sont prédites. De plus, sur l'autre graphique, on constate que l'erreur de prédiction n'atteint pas un palier avec cette valeur de cp, elle n'est donc pas minimale.
+
+### Résultats
+```{r}
+#Matrice de confusion pour le dernier arbre
+confusion0 = table(Y_forest_test,y_pred,dnn=list("Observed","Predicted"))
+
+df0 = as.data.frame(confusion0)
+df0 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion decision tree")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+
+```
+On constate que le score de précision est plutôt correct, sur les 10 itérations on obtient environ 60% de prédictions correctes. Cependant, lorsque l'on analyse la matrice de confusion, on constate que seules les 2 premières classes, les classes majoritaires, sont prédites. Les classes minoritaires 6 et 7 sont souvent confondues avec celles-ci, probablement car elles se ressemblent du point de vue de beaucoup de variables et que l'arbre n'est pas capable de distinguer ces détails.
+
+Pour continuer, nous allons choisir une valeur plus faible pour le paramètre cp. Cela forcera l'algorithme à utiliser plus de variables et ainsi construire un arbre plus profond et un modèle plus précis. 
+
+### Simulation
+```{r}
+N=10
+
+forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+accuracy_scores <- numeric(N) #Initiation du vecteur d'accuracy
+
+for (b in 1:N) { #Boucle pour la validation croisée
+  res=part_data(forest,freq_cover) #Sélection d'un sous jeu de données représentatif
+  itest=res[[2]] #Récuperation des indices des lignes pour le jeu de test
+  itrain=res[[1]]#Récuperation des indices des lignes pour le jeu d'entrainement
+  forest_test <-forest[itest,] #Création du jeu de test
+  forest_train <-forest[itrain,] #Création du jeu d'entrainement
+
+  #Exctraction des variables explicatives
+  X_forest_test <-forest_test[,1:54] 
+  X_forest_train <-forest_train[,1:54]
+  
+  #Extraction de la variable à prédire
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
+  
+  #Algorithme de l'arbre de décision
+  tree_model <- rpart(Cover_Type~., data = forest_train, method="class",control = rpart.control(cp = 0.0005)) 
+  
+  #La fonction rpart contrôle permet de créer des arbres plus profond lorsque cp est faible, tout en pénalisant la compléxité pour prévenir le surapprentissage.
+  
+  # Prédiction sur jeu de test à partir du modèle
+  y_pred <- predict(tree_model,forest_test, type='class')
+  
+  #Récupération du score de précision
+  accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
+
+}
+
+```
+
+### Résultats
+```{r}
+  plotcp(tree_model)
+```
+On constate déja que la valeur cp = 0.0005, permet d'atteindre un palier et donc de réduire l'erreur de prédiction. L'arbre en lui même n'est plus interprétable puisqu'il est trop complexe.
+
+```{r}
+#Matrice de confusion pour le dernier arbre
+confusion1 = table(Y_forest_test,y_pred,dnn=list("Observed","Predicted"))
+
+df1 = as.data.frame(confusion1)
+df1 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion decision tree")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+```
+On observe de meilleures performances de prédictions, 71% de prédictions correctes et toutes les classes sont prédites. On relève tout de même des difficultés à prédire les classes minoritaires.
+
+Il est maintenant intéressant de comparer ces résultats issus de la simulation du sous jeu de données aux résultats avec toutes les données. On réalise cette fois une autre forme de validation croisée où l'on réalise N simulations du modèle en prenant au hasard 2/3 du jeu en données d'entraînement. Le reste des données sont utilisées pour tester le modèle. 
+
+### Simulation
+```{r}
+N=10
+
+accuracy_scores <- numeric(N) #Initiation du vecteur d'accuracy
+
+for (b in 1:N) { #Boucle pour la validation croisée
+  forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+  
+  forest_test <-forest[400001:581011,] #Création du jeu de test
+  forest_train <-forest[1:400000,] #Création du jeu d'entrainement
+
+  #Exctraction des variables explicatives
+  X_forest_test <-forest_test[,1:54] 
+  X_forest_train <-forest_train[,1:54]
+  
+  #Extraction de la variable à prédire
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
+  
+  #Algorithme de l'arbre de décision
+  tree_model <- rpart(Cover_Type~., data = forest_train, method="class",control = rpart.control(cp = 0.0005)) 
+  
+  #La fonction rpart contrôle permet de créer des arbres plus profond lorsque cp est faible, tout en pénalisant la compléxité pour prévenir le surapprentissage.
+  
+  # Prédiction sur jeu de test à partir du modèle
+  y_pred <- predict(tree_model,forest_test, type='class')
+  
+  #Récupération du score de précision
+  accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
+
+}
+
+```
+
+### Résultats
+```{r}
+#Matrice de confusion pour le dernier arbre
+confusion1bis = table(Y_forest_test,y_pred,dnn=list("Observed","Predicted"))
+
+df1bis = as.data.frame(confusion1bis)
+df1bis %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion decision tree")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+```
+Les performances sont encore meilleures avec 87% de prédictions correctes et toutes les classes prédites.
+
+### Conclusion
+L'analyse avec le sous jeu de données nous a permis de calibrer le paramètre cp avec des temps de simulations faibles. Mais on constate que les performances de prédictions sont meilleures lorsque l'on utilise tout le jeu de données, ce qui était attendu pour ce data driven model.
+
+## Random forest
+Afin d'obtenir encore plus de précision dans les prédictions, on utilise maintenant un algorithme similaire mais plus élaboré. L'algorithme des forêts aléatoires permet de combiner les arbres de décision à chaque étape. 
+Le choix des paramètres de cette fonction est central
+pour  obtenir de bonnes performances de prédiction sans entraîner de surapprentissage. 
+  
+Par manque de temps, nous n'avons pas utilisé les algorithmes qui optimiseraient la valeur des paramètres. Tout d'abord nous avons fixé les valeurs de minsplit (nombre de noeud minimum) et maxdepth (profondeur maximum) à des valeur qui correspondent globalement à la forme de l'arbre obtenu précedement avec cp=0.0005, soit maxdepth=5 et minsplit=15.
+Nous avons ensuite procédé par tâtonnement avec le sous jeu de données pour fixer les valeurs de mtry et ntree. Pour une simulation, un nombre d'arbre, "ntree", seront construits à partir d'un échantillon bootstrap du jeu de données train avec un nombre, "mtry", de variables, choisi aléatoirement parmis les 54 variables explicatives. Ce paramètre mtry permet de minimiser la corrélation entre les arbres d'une forêt.  
+Nous avons ainsi testé plusieurs combinaisons de valeurs de mtry et ntree afin de faire le choix le plus parcimonieux entre précision de prédiction et temps de simulation. Nous avons conclut que prendre 20 variables pour chaques simulations est suffisant (ce nombre correspond aux ordres de grandeurs trouvés dans la littérature) et qu'il n'était pas nécessaire de choisir ntree au delà de 20 (avec ntree = 50, on a la même précision mais un temps de simulation plus long).
+
+Le code ci-dessous réalise la simulation avec les valeurs de paramètres sélectionés. 
+
+### Simulation
+```{r}
+
+for (nb_var in 11:55){
+  forest1 <- forest %>% 
+    mutate(across(colnames(forest)[nb_var], as.factor))
+}
+
+N=10 #Nombre d'itérations
+forest_shuffled <- forest1[sample(nrow(forest)), ] #Mélange aléatoire
+accuracy_scores <- numeric(N)
+
+for (b in 1:N) {  
+  res=part_data(forest1,freq_cover)
+  itest=res[[2]]
+  itrain=res[[1]]
+  forest_test <-forest1[itest,] #Test
+  forest_train <-forest1[itrain,] #Apprentissage
+
+  X_forest_test <-forest_test[,1:54]
+  X_forest_train <-forest_train[,1:54]
+  
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
+  
+  #Entrainement du modèle
+  rf <-randomForest(Cover_Type~.,data=forest_train,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
+  
+#Prédiction sur le jeu de données test
+  y_pred <- predict(rf,forest_test, type='class')
+  
+#Calcul de l'accuracy
+  accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
+  
+}
+
+```
+
+### Résultats
+```{r}
+
+#Matrice de confusion pour le dernier arbre
+confusion2 = table(Y_forest_test,y_pred,dnn=list("Observed","Predicted"))
+
+df2 = as.data.frame(confusion2)
+df2 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="#FF0000")+
+  coord_fixed()+
+  theme_minimal()+
+  ggtitle("Matrice de confusion random forest")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+mean_accuracy <- mean(accuracy_scores)
+cat("La moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+```
+
+Avec cette algorithme, on obtient 75% de prédictions correctes mais on observe la même tendance: une difficulté à prédire les classes minoritaires. 
+
+Cependant, l'algorithme des Random Forest nous donne accès à d'autres informations.
+
+```{r}
+op = par(mfrow=c(1,2), cex=0.5)
+#Lien OOB et ntree
+plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB")
+
+#Importance des variables explicatives
+plot(rf$importance)
+rf$importance
+
+```
+
+  Sur le premier graphique, qui explicite la relation entre l'erreur out-of-bag et la valeur du paramètre ntree, on constate que cette erreur est plutôt bien minimisée par la valeur de ntree choisie.  
+  On a ensuite accès à l'importance de chaque variables explicatives. Cette valeur d'importance est calculée en mesurant la différence d'accuracy à la suite de test de permutations entre les variables explicatives choisies. D'après le graphiques, les 20 premières variables explicatives sont les plus importante pour prédire correctement la variable Cover_Type. On prétend à une relation linéaire entre ces importances et ainsi déduire que la variable Elevation est 3 à 5 fois plus importante que les autres variables. Pour les reste, les autres variables quantitative et le facteur Wilderness area sont aussi relativement importants. En revanche, les variables Sol_type semble peu participer à l'analyse.
+  Ce résultat est intéressant puisqu'il peut être utile si l'on souhaite réduire la dimension du jeu de données pour d'autre type d'analyse (KNN, Regression ...)
+
+
+Pour finir, on semble avoir trouvé l'algorithme le plus performant pour prédire les Cover_Type en terme d'accuracy. Nous allons ainsi simuler cet algorithme avec la totalité du jeu de données pour essayer d'augmenter la précisions des prédictions et tirer des conclusions robustes.
+
+### Random Forest: jeu de données complet
+On réalise cette fois une autre forme de validation croisée ou l'on réalise N simulation du modèle en prenant au hasard 2/3 du jeu en données d'entrainement et le reste des données pour le test. 
+
+```{r}
+N=5 #Nombre d'itérations
+
+forest_shuffled <- forest1[sample(nrow(forest1)), ] 
+accuracy_scores <- numeric(N)
+accuracy_scores_overfit <- numeric(N)
+
+for (b in 1:N) { 
+  set.seed(b)
+  forest_shuffled <- forest1[sample(nrow(forest1)), ] 
+  forest_apprentissage <- forest_shuffled[1:400000, ] #Apprentissage
+  forest_test <- forest_shuffled[400001:581011, ]  #Test
+  
+  
+  # Préparation des données pour l'apprentissage
+  Y <- forest_apprentissage$Cover_Type
+  X <- forest_apprentissage[,1:54]
+
+  #Préparation des données pour le test
+  Y2 <- forest_test$Cover_Type
+  X2 <- forest_test[,1:54]
+  
+  #Entrainement du modèle
+  rf <-randomForest(Cover_Type~.,data=forest_apprentissage,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
+
+  #Prédiction sur le jeu de données test
+  y_pred <- predict(rf,forest_test, type='class')
+  
+    #Prédiction sur le jeu de données d'apprentissage
+  y_pred_overfit <- predict(rf,forest_apprentissage, type='class')
+
+  #Calcul des accuracy
+  accuracy_scores[b] <- sum(y_pred == Y2)/ length(Y2)
+  accuracy_scores_overfit[b] <- sum(y_pred_overfit == Y)/ length(Y)
+
+}
+```
+
+### Résulats
+```{r}
+confusion3 = table(Y2,y_pred,dnn=list("Observed","Predicted"))
+df3 = as.data.frame(confusion3)
+df3 %>% 
+  ggplot( aes(x = Observed, y = Predicted, fill = Freq))+
+  geom_tile()+
+  geom_text(aes(label = round(Freq, 1))) +
+  scale_fill_gradient(low="#FFFF88",high="red")+
+  coord_fixed()+
+  theme_minimal()+ggtitle("Matrice de confusion random forest")+
+  theme(axis.text = element_text(size = 12))+
+  theme(axis.title = element_text(size = 14))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+mean_accuracy <- mean(accuracy_scores)
+cat("Pour le jeu de données test, la moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy, "\n")
+
+mean_accuracy_overfit <- mean(accuracy_scores_overfit)
+cat("Pour le jeu de données d'apprentissage, la moyenne de la précision de l'algorithme après",N, "itération est de", mean_accuracy_overfit, "\n")
+```
+La valeur d'accuracy calculée sur le jeu de données d'apprentissage est très bonne (99%) ce qui prouve que le modèle est bien entrainé.
+Les résulats sont très bons, on obtient une accuracy de 96% sur le jeu de données test, cette valeur est suffisament proche de celle calculée sur le jeu de données d'apprentissage pour conclure qu'il n'y a pas de surapprentissage. Les classes minoritaires sont enfin correctement prédites.
+
+```{r}
+plot(rf$err.rate[, 1], type = "l", xlab = "nombre d'arbres", ylab = "erreur OOB")
+```
+
+On confirme le choix de ntree=20 qui minimise l'erreur de prédiction. 
+
+### Conclusion
+Pour conclure sur cet algorithme des Random Forest, on peut dire que celui-ci est très performant. Le temps de simulation est plus long mais on obtient une accuracy de 96% ce qui est très satisfaisant. De plus, avec la totalité des données, l'algorithme est plus précis et distingue même des classes minoritaires qui ressemblent à des classes majoritaires. 
+Les résultats de la validation croisée montrent qu'il n'y a pas de surapprentissage. 
+
 ## Algorithmes model-driven
 
 La méthode model-driven étudiée est le modèle multinomial. 
@@ -663,5 +1047,11 @@ Les écarts types des coefficients entre chaque simulations sont très grands, i
 | Decision tree | 0.72 à 0.87 |                                            |
 | Random forest | 0.78 à 0.98 |                                            |
 
-IDEE CONCLU: - Pour les datas driven methods: + de données = + accuracy - Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
+
+Après avoir testé différentes approches dans le but de maximiser l'accuracy des prédictions des Cover_Type, on constate que la précision va de 55% à 96%. Lorsque l'on travaille avec le sous jeu de données, on constate que les méthodes arbre de décision, random et regression multinomiale donnent des résultats relativement proche, autour de 75% d'accuracy. Seule la méthode des KNN est moins efficace.La réduction de la dimension suite à la PCA a probablement engendré une perte d'information et donc une diminution de la précision de l'algorithme. Pour les data driven méthodes, les arbres de décisions et les Random forest, c'est le fait de travailler avec un nombre conséquent de données qui permet d'améliorer l'accuracy et ainsi d'obtenir 96% de bonnes prédiction pour les Random Forest. A cause d'un temps de simulation trop élevé, nous avons pas pu simuler la regression multinomiale avec toutes les données, cela équivaut à simuler 83 fois le modèle présenté. Paralléliser et ainsi diminuer le temps de simulation aurait pu permettre de comparer ce résutlat à celui des Random Forest et ainsi de savoir lequels des deux algorithmes est le plus efficace en terme de prédiction.  
+  Dans la continuité de la regression multinomiale, nous aurions pu réaliser un réseau de neurones. Cependant, l'article associé à ce jeu de données a utilisé cette approche et a obtenu une accuracy moyenne de 71%. Les auteurs se disent deçus de ce résultat, et pense que cela provient de la diversité des variables (qualitative et quantitative), du déséquilibre de fréquence des Cover_Type et de leur difficulté à exploiter tout le jeu de données au vu des temps de simulations.
+  
+  Ainsi, malgré le fait que le jeu de données soit conséquent et nous ai posé des problèmes pour l'exploration de différents scénarios, la quantité de données est finalement le point fort qui permet d'obtenir cette accuracy de 96% avec les Random Forest. Ce jeu de données qui a la particularité d'être conséquent, rend donc l'algorithme des Random Forest, une data driven method, le plus performant tout en offrant un temps de simulation raisonnable. 
+  Si le jeu de données avait été moins conséquent, une approche data driven n'aurai peut etre pas été la plus performante. Une approche model driven aurait peut être été plus efficace, notamment pour prédire les classes minoritaires. 
+
 

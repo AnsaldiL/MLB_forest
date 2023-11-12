@@ -12,7 +12,7 @@ format:
 
 Prédiction des couverts forestiers à partir de variables cartographiques.
 
-![](\couverture.jpg)
+![](https://github.com/AnsaldiL/MLB_forest/blob/main/couverture.jpg?raw=true)
 
 ## Pourquoi utiliser le **machine learning** ?
 
@@ -67,27 +67,16 @@ name <- c("Elevation",
           a,
           "Cover_Type")
 colnames(forest)<- name
+
+
 Cov_type = forest$Cover_Type
+
 Xforest <- subset(forest, select = -Cover_Type)
 pcaXforest <- PCA(Xforest, ncp = 2) 
-```
 
-```{r,include=FALSE}
-#str(forest)
-100*table(forest$Cover_Type)/sum(table(forest$Cover_Type))
-```
-
-## Valeurs extremes de $X$
-
-```{r dataCov1, include=TRUE}
-par(mfrow=c(2,3))
-for (i in 1:6) {
-  boxplot(forest[,i],pch=16,col='salmon',xlab=colnames(forest)[i])
-}
 
 ```
-
-## Répartition des individus pour les variables qualitatives
+ qualitatives
 
 ```{r}
 quali <- apply(forest[,11:54], MARGIN = 2, table)
@@ -107,7 +96,7 @@ for (i in c(1,6)) {
 
 ## Méthodes testées
 
-![](Demarche.jpg)
+![](Demarche.jpg) ![](https://github.com/AnsaldiL/MLB_forest/blob/main/Demarche.jpg?raw=true)
 
 ## Data driven algorithms
 
@@ -236,7 +225,7 @@ C = factor(Cov_type,levels=c(1,2,3,4,5,6,7))
 nb_Cov_type <- length(unique(Cov_type))
 
 # on va trouver le meilleur nombre de voisin possible pour minimiser l'erreur
-nb_neighbors = c(1,5,10,20,25,30,35,40)
+nb_neighbors = c(1,10,20,50,100,150,200)
 
 n = dim(pcaXforest$ind$coord)[1]
 B = 10
@@ -246,8 +235,8 @@ err_knn = matrix(0,B,length(nb_neighbors))
 for (b in 1:B) { #10 répétitions du modèle 
   set.seed(b)
   
-  itrain <- unlist(part_data(forest)[1])
-  itest <- unlist(part_data(forest)[2])
+  itrain <- unlist(part_data(forest,freq_cover)[1])
+  itest <- unlist(part_data(forest,freq_cover)[2])
   
   
   Xs_train = scale(pcaXforest$ind$coord[itrain,])
@@ -278,8 +267,8 @@ y_test = y_prob = NULL
 for (b in 1:B){
   set.seed(b)
   
-  itrain <- unlist(part_data(forest)[1])
-  itest <- unlist(part_data(forest)[2])
+  itrain <- unlist(part_data(forest,freq_cover)[1])
+  itest <- unlist(part_data(forest, freq_cover)[2])
   
   Xs_train = scale(pcaXforest$ind$coord[itrain,])
   Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
@@ -311,8 +300,6 @@ df %>%
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-Avec le partitionnement 2/3 et 1/3, l'accurracy monte à 0.5693757
-
 # Algorithme decision tree
 
 ## Compléxité faible et partitionnement représentatif
@@ -326,6 +313,7 @@ accuracy_scores <- numeric(N)
 for (b in 1:N) { 
   res=part_data(forest,freq_cover)
   itest=res[[2]]
+  
   itrain=res[[1]]
   forest_test <-forest[itest,]
   forest_train <-forest[itrain,]
@@ -333,11 +321,11 @@ for (b in 1:N) {
   X_forest_test <-forest_test[,1:54]
   X_forest_train <-forest_train[,1:54]
   
-  Y_forest_test<-forest_test$Cov_type
-  Y_forest_train <-forest_train$Cov_type
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
   
   
-  tree_model <- rpart(Cov_type~., data = forest_train, method="class",control = rpart.control(cp = 0.1)) 
+  tree_model <- rpart(Cover_Type~., data = forest_train, method="class",control = rpart.control(cp = 0.1)) 
   
   # Évaluation de la précision
   y_pred <- predict(tree_model,forest_test, type='class')
@@ -345,6 +333,7 @@ for (b in 1:N) {
   accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
 
 }
+
 
 ```
 
@@ -404,11 +393,11 @@ for (b in 1:N) {
   X_forest_test <-forest_test[,1:54]
   X_forest_train <-forest_train[,1:54]
   
-  Y_forest_test<-forest_test$Cov_type
-  Y_forest_train <-forest_train$Cov_type
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
   
   
-  tree_model <- rpart(Cov_type~., data = forest_train, method="class",control = rpart.control(cp = 0.0005)) 
+  tree_model <- rpart(Cover_Type~., data = forest_train, method="class",control = rpart.control(cp = 0.0005)) 
   
   # Évaluation de la précision
   y_pred <- predict(tree_model,forest_test, type='class')
@@ -464,32 +453,43 @@ cat("La moyenne de la précision de l'algorithme après",N, "itération est de",
 
 ntree = 20, mtry = 20, maxdepth=5, minsplit=15
 
+```{r}
+for (nb_var in 11:55){
+  forest1 <- forest %>% 
+    mutate(across(colnames(forest)[nb_var], as.factor))
+}
+```
+
 ```{r, echo=TRUE}
+
 N=10
-forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+
+
+forest_shuffled <- forest1[sample(nrow(forest1)), ] #Mélange aléatoire
 accuracy_scores <- numeric(N)
 
-for (b in 1:N) {  
-  res=part_data(forest,freq_cover)
+
+for (b in 1:N) { #550 répétitions du modèle 
+  res=part_data(forest1, freq_cover)
   itest=res[[2]]
   itrain=res[[1]]
-  forest_test <-forest[itest,]
-  forest_train <-forest[itrain,]
-
+  forest_test <-forest1[itest,]
+  forest_train <-forest1[itrain,]
+  
   X_forest_test <-forest_test[,1:54]
   X_forest_train <-forest_train[,1:54]
   
-  Y_forest_test<-forest_test$Cov_type
-  Y_forest_train <-forest_train$Cov_type
+  Y_forest_test<-forest_test$Cover_Type
+  Y_forest_train <-forest_train$Cover_Type
   
   
-  rf <-randomForest(Cov_type~.,data=forest_train,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
-
+  rf <-randomForest(Cover_Type~., data = forest_train,ntree=20,mtry=20,control = rpart.control(maxdepth = 5,minsplit = 15))  #tree_model
+  
   y_pred <- predict(rf,forest_test, type='class')
   
   accuracy_scores[b] <- sum(y_pred == Y_forest_test)/ length(Y_forest_test)
-  
 }
+
 
 ```
 
@@ -546,28 +546,28 @@ rf$importance
 ## Partitionnement 2/3 entrainement, 1/3 test
 
 ```{r,echo=TRUE}
-N=5 #nombre d'itérations
-forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+N=1 #nombre d'itérations
+forest_shuffled <- forest1[sample(nrow(forest1)), ] #Mélange aléatoire
 accuracy_scores <- numeric(N)
 
 for (b in 1:N) { 
   set.seed(b)
-  forest_shuffled <- forest[sample(nrow(forest)), ] #Mélange aléatoire
+  forest_shuffled <- forest1[sample(nrow(forest1)), ] #Mélange aléatoire
   forest_apprentissage <- forest_shuffled[1:400000, ] #Apprentissage
   forest_test <- forest_shuffled[400001:581011, ]  #Test
   
   
   # Préparation des données pour l'apprentissage
-  Y <- forest_apprentissage$Cov_type
+  Y <- forest_apprentissage$Cover_Type
   X <- forest_apprentissage[,1:54]
   
   
   #Préparation des données pour le test
-  Y2 <- forest_test$Cov_type
+  Y2 <- forest_test$Cover_Type
   X2 <- forest_test[,1:54]
   
   
-  rf <-randomForest(Cov_type~.,data=forest_apprentissage,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
+  rf <-randomForest(Cover_Type~.,data=forest_apprentissage,ntree=20,mtry=20,control=rpart.control(maxdepth=5, minsplit=15))
 
   
   y_pred <- predict(rf,forest_test, type='class')
@@ -670,24 +670,19 @@ Xforest_red <- Xforest[,-9]
 
 ## Centrer et réduire les variables quantitatives
 
-```{r}
+```{r, eccho = TRUE}
 Xforest_red_cr <- Xforest_red
 Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,center = TRUE, scale = TRUE))
 ```
 
 ## Points de vigilance
 
--   Réduction du jeu de données  
-
--   Plan non orthogonal  
-
--   Sélection de variables avec un pénalité lasso  
 
 -   Comparaison par mesure d'accuracy
 
 ## Ecriture du modèle
 
-```{r fullmodel,include=TRUE}
+```{r fullmodel,eccho=TRUE}
 
 
 rep <- 10 #normalement sur 550 essais mais tournerait trop longtemps
@@ -760,15 +755,7 @@ T2<-Sys.time()
 
 (Tdiff= difftime(T2, T1))
 
-
 ```
-
-## Difficultés
-
--   Temps de calculs  
--   Comment sélectionner le tunning parameter  
--   Comment interpréter les coefficients des intéractions  
--   Quel échantillonnage choisir  
 
 ## Résultats: accuracy
 
@@ -855,8 +842,6 @@ for (i in 1:7) {
 
 ```
 
-![](\selectvar.png)
-
 ## Résultats: interprétation des coefficients d'intéractions
 
 Pour les deux intéractions importantes:
@@ -888,13 +873,3 @@ print(interactions)
 ```
 
 ## Comparaison des méthodes et conclusion
-
-| Méthode           | Accurracy   | Remarques                                  |
-|----------------|----------------|-----------------------------------------|
-| K-means           | 0.55        | Toutes les classes ne sont pas prédites... |
-| K-NN              | 0.37 à 0.57 | Résulats moyens                            |
-| Multinomial model | 0.72        |                                            |
-| Decision tree     | 0.72 à 0.87 |                                            |
-| Random forest     | 0.78 à 0.98 |                                            |
-
-IDEE CONCLU: - Pour les datas driven methods: + de données = + accuracy - Différence KNN- Random forest: la dimension reduction des KNN entraine une perte d'information par rapport au deux autres algo.
