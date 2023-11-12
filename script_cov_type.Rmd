@@ -8,6 +8,9 @@ output: html_document
 # Introduction et présentation des données
 ## Problématisation
 
+Dans cette étude, il s'agit d'utiliser le machine learning comme outil pour prédire la couverture forestière présente sur un territoire. L'étude poursuite celle réalisée dans un article publié en 1998 par Blackard et Dean. Les données ont été prélevée dans le parc National Roosevelt (Colorado). Cette problématique de prédiction de la couverture végétale est capitale pour les gestionnaires de territoires. Le machin learning permet d'avoir une idée de cette dernière sans avoir besoin de se déplacer sur le terrain. Cela peut-être particulièrement couteux en cas de zone innaccessibles ou éloignées. Il est également possible d'obtenir des informations sur un territoire n'étant pas sous notre contrôle direct. 
+Pour prédire cette couverture forestière (variable réponse), plusieurs variables quantitatives liées à la géographie et qualitative liées au type de sol sont regroupées dans un même tableau.
+
 ## Importation et formatage des données
 
 Importation des library nécessaires
@@ -221,7 +224,6 @@ part_data <- function(data,freq = rep(1/7,7)){
 table(forest$Cov_Type)
 freq_cover <- table(forest$Cov_Type)/length(forest$Cov_Type) # en proportions
 ```
-
 #### Algorithme des k-nearest neighbourgs
 ##### Principe de la méthode
 
@@ -236,7 +238,7 @@ C = factor(Cov_type,levels=c(1,2,3,4,5,6,7))
 nb_Cov_type <- length(unique(Cov_type))
 
 # on va trouver le meilleur nombre de voisin possible pour minimiser l'erreur
-nb_neighbors = c(1,5,10,20,25,30,35,40)
+nb_neighbors = c(1,10,20,50,100,150,200)
 
 n = dim(pcaXforest$ind$coord)[1]
 B = 10
@@ -246,8 +248,8 @@ err_knn = matrix(0,B,length(nb_neighbors))
 for (b in 1:B) { #10 répétitions du modèle 
   set.seed(b)
   
-  itrain <- unlist(part_data(forest)[1])
-  itest <- unlist(part_data(forest)[2])
+  itrain <- unlist(part_data(forest, freq_cover)[1])
+  itest <- unlist(part_data(forest, freq_cover)[2])
   
   
   Xs_train = scale(pcaXforest$ind$coord[itrain,])
@@ -265,9 +267,8 @@ boxplot(err_knn)
 w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
 print(paste("le nombre de voisins optimal est",nb_neighbors[w]))
 ```
-  
-  
-Application de l'algorithme aux données avec le nombre de voisins optimal
+
+Application de l'algorithme aux données avec le nombre de voisins optimal, avec le partitionnement du jeu de données
 
 ```{r}
 w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
@@ -278,8 +279,8 @@ y_test = y_prob = NULL
 for (b in 1:B){
   set.seed(b)
   
-  itrain <- unlist(part_data(forest)[1])
-  itest <- unlist(part_data(forest)[2])
+  itrain <- unlist(part_data(forest, freq_cover)[1])
+  itest <- unlist(part_data(forest, freq_cover)[2])
   
   Xs_train = scale(pcaXforest$ind$coord[itrain,])
   Xs_test = scale(pcaXforest$ind$coord[itest,],center=apply(pcaXforest$ind$coord[itrain,],2,mean),scale=apply(pcaXforest$ind$coord[itrain,],2,sd))
@@ -288,16 +289,13 @@ for (b in 1:B){
   y_test = c(y_test,C[itest])
 }
 
-#multiclass.roc(y_test, y_prob, level = 7, plot=TRUE) #interet de la courbe ROC..?
-
 Cres <- C[itest]
 
-conf_mat_knn = (conf_mat = table(Cres, knn_res, dnn=list("Predicted", "Observed")))
+conf_mat_knn = (table(Cres, knn_res, dnn=list("Predicted", "Observed")))
 print(conf_mat_knn)
 
 accuracy <- sum(knn_res == Cres)/(length(Cres))
 print(accuracy)
-#0.3579832
 
 # représentation de la matrice de confusion
 df = as.data.frame(conf_mat_knn)
@@ -314,13 +312,13 @@ df %>%
 
 ##### Algorithme des k-nearest neighbourgs pour prédire une couverture forestière, avec le partitionnement 2/3 et 1/3
 
-Application de l'algorithme aux données avec le nombre de voisins optimal. Cette fois, l'ensemble du jeu de données est utilisé.
+Application de l'algorithme aux données avec le nombre de voisins optimal. Cette fois, l'ensemble du jeu de données est utilisé. Attention, très gourmand en temps de calcul.
 
 ```{r}
 w = which.min(apply(err_knn,2,mean)) #le meilleur nombre de voisins
 
 n = dim(pcaXforest$ind$coord)[1]
-B = 1 # number of samples for the cross validation
+B = 10 # number of samples for the cross validation
 y_test = y_prob = NULL
 for (b in 1:B){
   set.seed(b)
@@ -343,7 +341,6 @@ print(conf_mat_knn)
 
 accuracy <- sum(knn_res == Cres)/(length(Cres))
 print(accuracy)
-#0.5693757 with B= 1
 
 df = as.data.frame(conf_mat_knn)
 df %>% 
@@ -358,13 +355,14 @@ df %>%
 
 ```
 
-Le résultat est meilleur lorsque l'ensemble du jeu de donnée est utilisé et est séparé en 2/3 de train et 1/3 de test. En effet, il s'agit d'une méthode datadriven, la solution doit donc "émerger" des données et pour celà, les données doivent être en quantité.
-Seules les classes 1 et 2 sont bien prédites, soit les classes les plus représentées. 
-La méthode n'est pas très efficace : accuracy de 0.36 avec le partionnement proposé et 0.57 avec les tiers. Cela s'explique par le grand déséquilibre dans les données et la sous-représentation de certaines classes par rapport aux autres.
+Le résultat est à peine meilleur lorsque l'ensemble du jeu de donnée est utilisé et est séparé en 2/3 de train et 1/3 de test. En effet, il s'agit d'une méthode datadriven, la solution doit donc "émerger" des données et pour celà, les données doivent être en quantité. Les résultats obtenus avec la fonction de partitionnement réalisée sont déjà très satisfaisants car cette dernière représente bien le jeu de données initial.
 
 ## Arbre de décision
 ### Introduction
 Dans un second temps, nous allons utiliser des data driven models mais cette fois-ci sans réduction de la dimension. Nous allons mettre en oeuvre un algorithme d'arbre de décision, notamment pour la facilité d'implémentation et d'interprétation. Il s'agit ici en l'occurence d'un arbre de classification puisque la variable à prédire est qualitative. Dans un but d'abord exploratoire, on réalisera les simulations avec un sous jeu de données construit pour être représentatif du jeu de données initial (fonction part_data), qui entrainera des temps de simulations moins élevés. Afin de prévenir et détecter du sur-apprentissage on mettra en place une méthode de validation croisée en simulant l'algorithme N fois avec des jeu d'apprentissages et de test tirés au hasard dans le sous jeu de données. 
+  
+Seules les classes 1 et 2 sont bien prédites, soit les classes les plus représentées. 
+La méthode n'est plutôt satisfaisante : accuracy de 0.57 avec le partionnement proposé l'accuracy est la même  avec les tiers. Cela s'explique par le grand déséquilibre dans les données et la sous-représentation de certaines classes par rapport aux autres.
 
 ### Simulation
 On commence d'abord par la simulation d'un arbre peu profond avec le paramètre par défaut cp=0.1
