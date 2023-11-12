@@ -19,7 +19,7 @@ library(ggplot2)
 library(class)
 library(ggplot2) 
 library(corrplot)
-library(glmnet) # multinomiale avec pénalité lasso
+library(glmnet) 
 library(rpart)
 library(partykit)
 #library(caret)
@@ -91,7 +91,7 @@ for (i in 1:10) {
 
 ```
 
-Les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
+Les valeurs d'ombrages peuvent sembler très basses mais les points sans ombre à 9 heures ne sont pas les mêmes que ceux à 12 heures, les valeurs paraissent cohérentes.Les autres valeurs semblent plausibles.
 
 
 ### Répartition des individus pour les variables qualitatives 
@@ -104,7 +104,7 @@ print(as.data.frame(round(100*quali[2,]/(quali[1,]+quali[2,]),digits = 2),option
 En calculant le pourcentage des observations appartenant à chaque classe de "Wilderness area" et de "Soil type, on remarque que Wilderness area 2 et 4 ne représentent respectivement que 5.1 et 6.4 % des observations.\
 \
 
-Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numero 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
+Pour les types de sols, on remarque que la plupart sont assez peu représentés avec un pourcentage de représentation de l'ordre de $10^{-1}$ ou $10^{0}$. Le type de sol numéro 29 est particulièrement représenté avec environ 20% des sols échantillonnés lui correspondant. Le sol le moins représenté est le sol 15 qui a un pourcentage de représentation de l'ordre de $10^{-4}$.
 
 ### Relations entre X & Y 
 
@@ -119,12 +119,12 @@ for (i in 1:10) {
 
 ```
 
-Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude semble jouer un rôle important pour discriminer les différents types de couvert végétal.
+Sans analyses plus poussées on ne peut que faire des hypothèses sur les variables impactant Y. Ainsi, l'altitude et la distance à la route semblent jouer un rôle important pour discriminer les différents types de couverts végétaux.
 
 # Implémentation des algorithmes de machine learning
-## Data driven algorithms
+## Algorithmes data driven 
 
-### Unsupervised
+### Non-spervisés
 
 #### Algorithme des k-means
 ##### Principe de la méthode
@@ -181,7 +181,7 @@ Finalement, l'algorithme n'a pas su former des groupes correspondant aux Cover t
 
 ### Supervised
 
-Pour les apprentissages supervisés, il s'agit de commencer l'analyse en séprant le jeu de donné en deux set, train et test, pour d'abord entrainer l'algorithme puis l'évaluer sur des données différentes. La valeur choisie est généralement 2/3 de train et 1/3 de test. Pour comparer avec la méthode model driven, un partiotionnement particulier a été réalisé sur une plus faible partie du jeu de donnée.
+Pour les apprentissages supervisés, il s'agit de commencer l'analyse en séparant le jeu de donné en deux set, train et test, pour d'abord entrainer l'algorithme puis l'évaluer sur des données différentes. La valeur choisie est généralement 2/3 de données d'entraînement et 1/3 de données test. Pour comparer avec la méthode model driven, un partitionnement particulier a été réalisé sur une plus faible partie du jeu de donnée.
 
 Voici la fonction de partitionnement implémentée :
 
@@ -203,7 +203,7 @@ part_data <- function(data,freq = rep(1/7,7)){
     itrain <- c(itrain,sample(x = setdiff(which(data[,i] == 1 ),itrain),size = 3)) #dans les données pas deja echantilonnee 
   }
   
-  # on force l'echantillon d'entrainement à avoir au moins 1000 observations par type de recouvrement végétal
+  # on force l'echantillon d'entrainement à avoir au moins 7000 observations dans les fréquences respectives de chaques classes
   nb <- freq*7000
   for (i in 1:7) {
     itrain <- c(itrain,sample(x = setdiff(which(data$Cover_Type == i),itrain),size = nb[i]))
@@ -217,7 +217,7 @@ part_data <- function(data,freq = rep(1/7,7)){
 }
 
 
-#Fréquence de chaque classe
+# Fréquence de chaque classe
 table(forest$Cov_Type)
 freq_cover <- table(forest$Cov_Type)/length(forest$Cov_Type) # en proportions
 ```
@@ -225,7 +225,7 @@ freq_cover <- table(forest$Cov_Type)/length(forest$Cov_Type) # en proportions
 #### Algorithme des k-nearest neighbourgs
 ##### Principe de la méthode
 
-La méthode des K-NN consiste à réaliser une moyenne entre les individus voisins pour estimer la variable d'interet. Le nombre optimal de voisin doit être identifié car l'algorithme est sensible à ce choix. Comme il s'agit de classification, la réponse est estimée au vote majoritaire afin de prédire la classe.
+La méthode des K-NN consiste à réaliser une moyenne entre les individus voisins pour estimer la variable d'intérêt. Le nombre optimal de voisin doit être identifié car l'algorithme est sensible à ce choix. Comme il s'agit de classification, la réponse est estimée au vote majoritaire afin de prédire la classe.
 
 ##### Algorithme des k-nearest neighbourgs pour prédire une couverture forestière, avec le partitionnement présenté
 
@@ -362,18 +362,19 @@ Le résultat est meilleur lorsque l'ensemble du jeu de donnée est utilisé et e
 Seules les classes 1 et 2 sont bien prédites, soit les classes les plus représentées. 
 La méthode n'est pas très efficace : accuracy de 0.36 avec le partionnement proposé et 0.57 avec les tiers. Cela s'explique par le grand déséquilibre dans les données et la sous-représentation de certaines classes par rapport aux autres.
 
-# Methodes model-driven
+## Algorithmes model-driven
 
-La méthode model-driven étudiée est le modèle multinomial.
+La méthode model-driven étudiée est le modèle multinomial. 
 
-## Formalisme du modèle multinomial:
+### Formalisme du modèle multinomial:
 
 $$ Cover \: type \: \sim \: Elevation \: + \: Aspect \: + \: Slope \: + \: ... \: + \: Soil \: type \: 40 \: + \: Interactions$$
 
 $Y = Cover \: type$, la variable réponse\
 $Xs$ les variables prédictives\
+Le but de cette méthode est de minimiser l'erreur en choisissant des coefficients apropriés.
 
-## Analyse des interactions entre les variables X
+### Analyse des interactions entre les variables X
 
 Pour estimer quelles intéractions sont à inclure dans le modèle, on peut représenter les variables quantitatives X en fonction des variables X qualitatives
 
@@ -407,7 +408,7 @@ Interactions potentielles :\
 - Slope, soil type\
 - Elevation, Wilderness area
 
-## Analyse des corrélations entre les X quantitatifs
+### Analyse des corrélations entre les X quantitatifs
 
 Les modèles linéaire généralisés sont sensibles aux variables explicatives trop correlées entre elles, il faut donc vérifier les corrélations.
 
@@ -417,16 +418,16 @@ corrplot.mixed(M,upper="square",lower.col="black", tl.col="black",cl.cex = 0.7,t
 Xforest_red <- Xforest[,-9]
 ```
 
-L'ombre à 3h est corrélée avec un coefficient r=-0.78 avec l'ombre à 9h. Si on prend un seuil à 0.7 on retire cette l'ombre à 3h arbitrairement.
+L'ombre à 3h est corrélée avec un coefficient r=-0.78 avec l'ombre à 9h. Si on prend un seuil à 0.7 on retire l'ombre à 3h.
 
-## Centrer et réduire les variables quantitatives
+### Centrer et réduire les variables quantitatives
 
 ```{r}
 Xforest_red_cr <- Xforest_red
 Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,center = TRUE, scale = TRUE))
 ```
 
-## Modèle
+### Modèle
 
 -   Le modèle linéaire ne peut pas tourner sur 387341 données, donc on fait plusieurs fois tourner sur environ 4000 données. Dans l'idéal on le fait tourner environ 85 fois pour que le total des données d'entraînement représente environ 2/3 des données. Puis on devrait tester les predictions moyennes sur les 85 sous modèles sur le tier restant des données. Dans la pratique, on ne le fait tourner que dix fois car la puissance de nos ordinateurs est trop faible. \
 
@@ -436,9 +437,8 @@ Xforest_red_cr[1:9] <- apply(Xforest_red_cr[1:9],MARGIN = 2,function(X) scale(X,
 
 -   Pour tester la qualité du modèle on s'intéresse à l'accuracy moyenne, soit le nombre moyen de cover types correctement prédits sur l'ensemble des modèles simulés divisé par le nombre total de cover type testé.
 
-## Ecriture du modèle
+### Ecriture du modèle
 
-On utilise une fonction qui optimize automatiquement la valeur du tuning parameter pour la pénalité lasso.
 
 ```{r fullmodel,include=TRUE}
 
@@ -517,6 +517,8 @@ T2<-Sys.time()
 
 
 ```
+
+On utilise une fonction qui optimize automatiquement la valeur du tuning parameter pour la pénalité lasso.
 
 Plusieurs difficultés ont été rencontrées lors de cette étape: \ 
 1- Comment choisir la pénalité lasso: test avec l'AIC, le BIC, otimisation par R. \ 
@@ -609,7 +611,7 @@ for (i in 1:7) {
 
 ![](\selectvar.png)
 
-Représentées en bleu, les variables qui entrent en compte dans la prédiction des types de couvertures (de 1 à 7) au  moins 80% des fois, en rouge les autres. La colonne de droite correspond aux variables utilisées dans l'algorithme de random forest, en rouge celle dont la contribution est < à XXX et en bleu celle dont elle est supérieure à XXX. Les variables en plus claires représentent les variables propres à la régression linéaire soit: les interactions et l'intercept. \ 
+Représentées en bleu, les variables qui entrent en compte dans la prédiction des types de couvertures (de 1 à 7) au  moins 80% des fois, en rouge les autres. La colonne de droite correspond aux variables utilisées dans l'algorithme de random forest, en rouge celle dont la contribution est inférieure à 100 et en bleu celle dont elle est supérieure à 100. Les variables en plus claires représentent les variables propres à la régression linéaire soit: les interactions et l'intercept. \ 
   
   
 
@@ -620,7 +622,7 @@ On ne remarque pas de motif particulier dans les variables importantes et pas de
 
 
 
-## Attention à l'interprétation des coefficients d'intéractions
+### Attention à l'interprétation des coefficients d'intéractions
 
 Pour les deux intéractions importantes, on regarde si les coefficients varient selon les simulations. On fait attention à cela notamment parce que le plan n'est pas orthognoal
 
